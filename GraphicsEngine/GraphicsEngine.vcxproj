@@ -93,6 +93,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);C:\Users\aravp\OneDrive\Documents\Thirdpartylibraries\Include;$(IncludePath)</IncludePath>
     <LibraryPath>$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);C:\Users\aravp\OneDrive\Documents\Thirdpartylibraries\Libs;$(LibraryPath)</LibraryPath>
+    <OutDir>C:\Users\aravp\source\repos\GraphicsEngine\GraphicsEngine</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);C:\Users\aravp\OneDrive\Documents\Thirdpartylibraries\Include;$(IncludePath)</IncludePath>
