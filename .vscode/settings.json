@@ -6,5 +6,6 @@
     "files.associations": {
         "iostream": "cpp",
         "sstream": "cpp"
-    }
+    },
+    "cmake.configureOnOpen": false
 }

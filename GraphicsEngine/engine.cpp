@@ -258,7 +258,7 @@ int main() {
 		// sum/=fts;
 		
 		// std::cout << sum << std::endl;
-		std::cout << 1/deltaTime << std::endl;
+		//std::cout << 1/deltaTime << std::endl;
 		processInput(window);
 
 		//clear
