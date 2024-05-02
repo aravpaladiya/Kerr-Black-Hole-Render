@@ -1,0 +1,10 @@
+{
+    "C_Cpp.default.enableConfigurationSquiggles": true,
+    "C_Cpp.default.includePath": [
+        "C:\\Users\\aravp\\OneDrive\\Documents\\Thirdpartylibraries\\Include"
+    ],
+    "files.associations": {
+        "iostream": "cpp",
+        "sstream": "cpp"
+    }
+}
