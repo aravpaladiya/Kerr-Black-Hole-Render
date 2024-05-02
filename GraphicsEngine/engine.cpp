@@ -236,15 +236,29 @@ int main() {
 
 
 	*************************/
-
-
+	// int fts = 200 ; 
+	// float frameTimes[fts] = {0.0f};
+	// for (int i = 0; i < fts; i++) {
+	// 	frameTimes[fts] = 0;
+	// }
 
 	while (!glfwWindowShouldClose(window)) {
 
 		float currentFrame = glfwGetTime();
 		deltaTime = currentFrame - lastFrame;
 		lastFrame = currentFrame;
+		// float sum = 0;
 
+		// for (int i = 0; i < fts-1; i++) {
+		// 	frameTimes[i] = frameTimes[i+1];
+		// 	sum+=frameTimes[i];
+		// }
+		// frameTimes[fts] = 1/deltaTime;
+		// sum+=frameTimes[fts];
+		// sum/=fts;
+		
+		// std::cout << sum << std::endl;
+		std::cout << 1/deltaTime << std::endl;
 		processInput(window);
 
 		//clear
@@ -276,7 +290,7 @@ int main() {
 		for (int i = 0; i < 10; i++) {
 			mat4 model = mat4(1.0f);
 			model = glm::translate(model, cubePositions[i]);
-
+ 
 
 
 
