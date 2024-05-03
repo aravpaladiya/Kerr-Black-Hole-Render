@@ -25,7 +25,7 @@ boolean firstMouse = true;
 
 
 Camera camera = Camera(vec3(0.0f, 0.0f, 3.0f), vec3(0.0f, 1.0f, 0.0f));
-vec3 lightPos = vec3(3.0f, 2.0f, -6.0f);
+vec3 lightPos = vec3(0.0f, 0.0f, -0.0f);
 
 //resize rendering window when window resized
 void framebuffer_size_callback(GLFWwindow* window, int width, int height) {
@@ -112,44 +112,57 @@ int main() {
 
 
 	float vertices[] = {
-		-0.5f, -0.5f, -0.5f,
-		0.5f,  -0.5f, -0.5f,
-		0.5f,  0.5f,  -0.5f,
-		0.5f,  0.5f,  -0.5f,
-		-0.5f, 0.5f, -0.5f, 
-		-0.5f, -0.5f, -0.5f, 
-		-0.5f, -0.5f, 0.5f,  
-		0.5f,  -0.5f, 0.5f,  
-		0.5f,  0.5f,  0.5f,  
-		0.5f,  0.5f,  0.5f,  
-		-0.5f, 0.5f,  0.5f,  
-		-0.5f, -0.5f, 0.5f,  
-		-0.5f, 0.5f,  0.5f,  
-		-0.5f, 0.5f,  -0.5f, 
-		-0.5f, -0.5f, -0.5f, 
-		-0.5f, -0.5f, -0.5f, 
-		-0.5f, -0.5f, 0.5f,  
-		-0.5f, 0.5f,  0.5f,  
-		0.5f,  0.5f,  0.5f,  
-		0.5f,  0.5f,  -0.5f, 
-		0.5f,  -0.5f, -0.5f, 
-		0.5f,  -0.5f, -0.5f, 
-		0.5f,  -0.5f, 0.5f,  
-		0.5f,  0.5f,  0.5f,  
-		-0.5f, -0.5f, -0.5f, 
-		0.5f,  -0.5f, -0.5f, 
-		0.5f,  -0.5f, 0.5f,  
-		0.5f,  -0.5f, 0.5f,  
-		-0.5f, -0.5f, 0.5f,  
-		-0.5f, -0.5f, -0.5f, 
-		-0.5f, 0.5f,  -0.5f, 
-		0.5f,  0.5f,  -0.5f, 
-		0.5f,  0.5f,  0.5f,  
-		0.5f,  0.5f,  0.5f,  
-		-0.5f, 0.5f,  0.5f,  
-		-0.5f, 0.5f,  -0.5f, 
-	};
+        -0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
+         0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
+         0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
+         0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
+        -0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
+        -0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
 
+        -0.5f, -0.5f,  0.5f,  0.0f,  0.0f,  1.0f,
+         0.5f, -0.5f,  0.5f,  0.0f,  0.0f,  1.0f,
+         0.5f,  0.5f,  0.5f,  0.0f,  0.0f,  1.0f,
+         0.5f,  0.5f,  0.5f,  0.0f,  0.0f,  1.0f,
+        -0.5f,  0.5f,  0.5f,  0.0f,  0.0f,  1.0f,
+        -0.5f, -0.5f,  0.5f,  0.0f,  0.0f,  1.0f,
+
+        -0.5f,  0.5f,  0.5f, -1.0f,  0.0f,  0.0f,
+        -0.5f,  0.5f, -0.5f, -1.0f,  0.0f,  0.0f,
+        -0.5f, -0.5f, -0.5f, -1.0f,  0.0f,  0.0f,
+        -0.5f, -0.5f, -0.5f, -1.0f,  0.0f,  0.0f,
+        -0.5f, -0.5f,  0.5f, -1.0f,  0.0f,  0.0f,
+        -0.5f,  0.5f,  0.5f, -1.0f,  0.0f,  0.0f,
+
+         0.5f,  0.5f,  0.5f,  1.0f,  0.0f,  0.0f,
+         0.5f,  0.5f, -0.5f,  1.0f,  0.0f,  0.0f,
+         0.5f, -0.5f, -0.5f,  1.0f,  0.0f,  0.0f,
+         0.5f, -0.5f, -0.5f,  1.0f,  0.0f,  0.0f,
+         0.5f, -0.5f,  0.5f,  1.0f,  0.0f,  0.0f,
+         0.5f,  0.5f,  0.5f,  1.0f,  0.0f,  0.0f,
+
+        -0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f,
+         0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f,
+         0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f,
+         0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f,
+        -0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f,
+        -0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f,
+
+        -0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f,
+         0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f,
+         0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,
+         0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,
+        -0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,
+        -0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f
+    };
+	float vsf = 1.0f;
+	for (int i = 0; i < 216; i++) {
+		vertices[i]*=vsf;
+		i++;
+		vertices[i]*=vsf;
+		i++;
+		vertices[i]*=vsf;
+		i+=3;
+	}
 	vec3 cubePositions[] = {
 		vec3(0.0f, 0.0f, 0.0f),
 		vec3(2.0f, 5.0f, -15.0f),
@@ -179,8 +192,11 @@ int main() {
 
 	glBindBuffer(GL_ARRAY_BUFFER, VBO);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
 	glEnableVertexAttribArray(0);
+
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*) (3*sizeof(float)));
+	glEnableVertexAttribArray(1);
 
 	
 	unsigned int lightVAO;
@@ -194,8 +210,8 @@ int main() {
 	glBindBuffer(GL_ARRAY_BUFFER, lightVBO);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
-	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-	glEnableVertexAttribArray(1);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
+	glEnableVertexAttribArray(0);
 
 
 	glBindVertexArray(0);
@@ -296,9 +312,13 @@ int main() {
 		glBindVertexArray(VAO);
 
 		mat4 cubeModel = mat4(1.0f);
-		cubeModel = translate(cubeModel, vec3(0.0f, 0.0f, -3.0f));
+		// cubeModel = translate(cubeModel, vec3(3.0f*cos(glfwGetTime()/3), 2.0f*sin(glfwGetTime()/3), 3.0f*sin(glfwGetTime()/3)));
+		cubeModel = translate(cubeModel, vec3(1.5f, 1.0f, -3.0f));
 
-
+		shader.setVec3("objColor", 1.0f, 0.5f, 0.0f);
+		shader.setVec3("lightPos", lightPos);
+		shader.setVec3("lightColor", 1.0f, 1.0f, 1.0f);
+		shader.setVec3("eye", camera.Position);
 
 		shader.setMat4("view", view);
 		shader.setMat4("projection", projection);
@@ -311,6 +331,7 @@ int main() {
 		mat4 lightModel = mat4(1.0f);
 		lightModel = translate(lightModel, lightPos);
 
+		
 		lightShader.setMat4("view", view);
 		lightShader.setMat4("projection", projection);
 		lightShader.setMat4("model", lightModel);

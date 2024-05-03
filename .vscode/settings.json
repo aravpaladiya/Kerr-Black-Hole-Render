@@ -5,7 +5,9 @@
     ],
     "files.associations": {
         "iostream": "cpp",
-        "sstream": "cpp"
+        "sstream": "cpp",
+        "*.vs": "glsl",
+        "*.fs": "glsl"
     },
     "cmake.configureOnOpen": false
 }
