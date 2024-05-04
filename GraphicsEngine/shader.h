@@ -61,7 +61,7 @@ public:
         if (!success)
         {
             glGetShaderInfoLog(vertex, 512, NULL, infoLog);
-            std::cout << "ERROR::SHADER::VERTEX::COMPILATION_FAILED\n";
+            std::cout << "ERROR::SHADER::VERTEX::COMPILATION_FAILED\n" << infoLog << std::endl;
         }
 
         fragment = glCreateShader(GL_FRAGMENT_SHADER);
@@ -71,7 +71,7 @@ public:
         if (!success)
         {
             glGetShaderInfoLog(fragment, 512, NULL, infoLog);
-            std::cout << "ERROR::SHADER::FRAGMENT::COMPILATION_FAILED\n";
+            std::cout << "ERROR::SHADER::FRAGMENT::COMPILATION_FAILED\n" << infoLog << std::endl;
         }
         ID = glCreateProgram();
         glAttachShader(ID, vertex);
@@ -120,5 +120,6 @@ public:
     void setVec3(const std::string& name, float x, float y, float z) {
         glUniform3f(glGetUniformLocation(ID, name.c_str()), x, y, z);
     }
+
 };
 #endif
