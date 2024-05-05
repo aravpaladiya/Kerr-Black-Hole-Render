@@ -27,6 +27,7 @@
                 "${fileDirname}/\\*.cpp",				
                 "${fileDirname}/glad.c",
                 "-lglfw3dll",
+                "-lassimp",
                 "-o",
                 "${fileDirname}\\${fileBasenameNoExtension}.exe",
                 "-I",
