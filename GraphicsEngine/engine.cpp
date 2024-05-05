@@ -1,17 +1,13 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
-#include <iostream>
 #include "shader.h"
-#include <windows.h>
 #include "stb_image.h"
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtc/type_ptr.hpp>
 #include "Camera.h"
+#include "pch.h"
 
 using namespace glm;
 
-boolean userExternal = false;
+bool userExternal = false;
 
 int WIDTH = 800;
 int HEIGHT = 600;
@@ -21,11 +17,11 @@ float deltaTime = 0.0f;
 
 float lastX = WIDTH / 2;
 float lastY = HEIGHT / 2;
-boolean firstMouse = true;
+bool firstMouse = true;
 
 
 Camera camera = Camera(vec3(0.0f, 0.0f, 3.0f), vec3(0.0f, 1.0f, 0.0f));
-vec3 lightPos = vec3(0.0f, 0.0f, -0.0f);
+vec3 lightPos(1.2f, 1.0f, 2.0f);
 
 //resize rendering window when window resized
 void framebuffer_size_callback(GLFWwindow* window, int width, int height) {
@@ -147,50 +143,68 @@ int main() {
 
 
 	float vertices[] = {
-    // positions          // normals           // texture coords
-    -0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f,  0.0f, 0.0f,
-     0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f,  1.0f, 0.0f,
-     0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f,  1.0f, 1.0f,
-     0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f,  1.0f, 1.0f,
-    -0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f,  0.0f, 1.0f,
-    -0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f,  0.0f, 0.0f,
+		// positions          // normals           // texture coords
+		-0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f,  0.0f, 0.0f,
+		0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f,  1.0f, 0.0f,
+		0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f,  1.0f, 1.0f,
+		0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f,  1.0f, 1.0f,
+		-0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f,  0.0f, 1.0f,
+		-0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f,  0.0f, 0.0f,
 
-    -0.5f, -0.5f,  0.5f,  0.0f,  0.0f, 1.0f,   0.0f, 0.0f,
-     0.5f, -0.5f,  0.5f,  0.0f,  0.0f, 1.0f,   1.0f, 0.0f,
-     0.5f,  0.5f,  0.5f,  0.0f,  0.0f, 1.0f,   1.0f, 1.0f,
-     0.5f,  0.5f,  0.5f,  0.0f,  0.0f, 1.0f,   1.0f, 1.0f,
-    -0.5f,  0.5f,  0.5f,  0.0f,  0.0f, 1.0f,   0.0f, 1.0f,
-    -0.5f, -0.5f,  0.5f,  0.0f,  0.0f, 1.0f,   0.0f, 0.0f,
+		-0.5f, -0.5f,  0.5f,  0.0f,  0.0f, 1.0f,   0.0f, 0.0f,
+		0.5f, -0.5f,  0.5f,  0.0f,  0.0f, 1.0f,   1.0f, 0.0f,
+		0.5f,  0.5f,  0.5f,  0.0f,  0.0f, 1.0f,   1.0f, 1.0f,
+		0.5f,  0.5f,  0.5f,  0.0f,  0.0f, 1.0f,   1.0f, 1.0f,
+		-0.5f,  0.5f,  0.5f,  0.0f,  0.0f, 1.0f,   0.0f, 1.0f,
+		-0.5f, -0.5f,  0.5f,  0.0f,  0.0f, 1.0f,   0.0f, 0.0f,
 
-    -0.5f,  0.5f,  0.5f, -1.0f,  0.0f,  0.0f,  1.0f, 0.0f,
-    -0.5f,  0.5f, -0.5f, -1.0f,  0.0f,  0.0f,  1.0f, 1.0f,
-    -0.5f, -0.5f, -0.5f, -1.0f,  0.0f,  0.0f,  0.0f, 1.0f,
-    -0.5f, -0.5f, -0.5f, -1.0f,  0.0f,  0.0f,  0.0f, 1.0f,
-    -0.5f, -0.5f,  0.5f, -1.0f,  0.0f,  0.0f,  0.0f, 0.0f,
-    -0.5f,  0.5f,  0.5f, -1.0f,  0.0f,  0.0f,  1.0f, 0.0f,
+		-0.5f,  0.5f,  0.5f, -1.0f,  0.0f,  0.0f,  1.0f, 0.0f,
+		-0.5f,  0.5f, -0.5f, -1.0f,  0.0f,  0.0f,  1.0f, 1.0f,
+		-0.5f, -0.5f, -0.5f, -1.0f,  0.0f,  0.0f,  0.0f, 1.0f,
+		-0.5f, -0.5f, -0.5f, -1.0f,  0.0f,  0.0f,  0.0f, 1.0f,
+		-0.5f, -0.5f,  0.5f, -1.0f,  0.0f,  0.0f,  0.0f, 0.0f,
+		-0.5f,  0.5f,  0.5f, -1.0f,  0.0f,  0.0f,  1.0f, 0.0f,
 
-     0.5f,  0.5f,  0.5f,  1.0f,  0.0f,  0.0f,  1.0f, 0.0f,
-     0.5f,  0.5f, -0.5f,  1.0f,  0.0f,  0.0f,  1.0f, 1.0f,
-     0.5f, -0.5f, -0.5f,  1.0f,  0.0f,  0.0f,  0.0f, 1.0f,
-     0.5f, -0.5f, -0.5f,  1.0f,  0.0f,  0.0f,  0.0f, 1.0f,
-     0.5f, -0.5f,  0.5f,  1.0f,  0.0f,  0.0f,  0.0f, 0.0f,
-     0.5f,  0.5f,  0.5f,  1.0f,  0.0f,  0.0f,  1.0f, 0.0f,
+		0.5f,  0.5f,  0.5f,  1.0f,  0.0f,  0.0f,  1.0f, 0.0f,
+		0.5f,  0.5f, -0.5f,  1.0f,  0.0f,  0.0f,  1.0f, 1.0f,
+		0.5f, -0.5f, -0.5f,  1.0f,  0.0f,  0.0f,  0.0f, 1.0f,
+		0.5f, -0.5f, -0.5f,  1.0f,  0.0f,  0.0f,  0.0f, 1.0f,
+		0.5f, -0.5f,  0.5f,  1.0f,  0.0f,  0.0f,  0.0f, 0.0f,
+		0.5f,  0.5f,  0.5f,  1.0f,  0.0f,  0.0f,  1.0f, 0.0f,
 
-    -0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f,  0.0f, 1.0f,
-     0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f,  1.0f, 1.0f,
-     0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f,  1.0f, 0.0f,
-     0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f,  1.0f, 0.0f,
-    -0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f,  0.0f, 0.0f,
-    -0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f,  0.0f, 1.0f,
+		-0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f,  0.0f, 1.0f,
+		0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f,  1.0f, 1.0f,
+		0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f,  1.0f, 0.0f,
+		0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f,  1.0f, 0.0f,
+		-0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f,  0.0f, 0.0f,
+		-0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f,  0.0f, 1.0f,
 
-    -0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f,  0.0f, 1.0f,
-     0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f,  1.0f, 1.0f,
-     0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,  1.0f, 0.0f,
-     0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,  1.0f, 0.0f,
-    -0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,  0.0f, 0.0f,
-    -0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f,  0.0f, 1.0f
-};
+		-0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f,  0.0f, 1.0f,
+		0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f,  1.0f, 1.0f,
+		0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,  1.0f, 0.0f,
+		0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,  1.0f, 0.0f,
+		-0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,  0.0f, 0.0f,
+		-0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f,  0.0f, 1.0f
+	};
 
+	vec3 cubePositions[] = {
+		vec3( 0.0f,  0.0f,  0.0f),
+		vec3( 2.0f,  5.0f, -15.0f),
+		vec3(-1.5f, -2.2f, -2.5f),
+		vec3(-3.8f, -2.0f, -12.3f),
+		vec3( 2.4f, -0.4f, -3.5f),
+		vec3(-1.7f,  3.0f, -7.5f),
+		vec3( 1.3f, -2.0f, -2.5f),
+		vec3( 1.5f,  2.0f, -2.5f),
+		vec3( 1.5f,  0.2f, -1.5f),
+		vec3(-1.3f,  1.0f, -1.5f)
+	};
+	vec3 pointLightPositions[] = {
+        vec3( 0.7f,  0.2f,  2.0f), vec3(1.0f, 0.0f, 0.0f),
+        vec3( 2.3f, -3.3f, -4.0f), vec3(0.0f, 1.0f, 0.0f),
+        vec3(-4.0f,  2.0f, -12.0f), vec3(0.0f, 0.0f, 1.0f),
+        vec3( 0.0f,  0.0f, -3.0f), vec3(1.0f, 1.0f, 0.0f)
+    };
 
 	//vao
 
@@ -326,47 +340,101 @@ int main() {
 
 		mat4 view = camera.GetViewMatrix();
 
-		mat4 projection = glm::perspective(glm::radians(camera.Zoom), 
+		mat4 projection = perspective(radians(camera.Zoom), 
 		(float)w / (float)h, 0.1f, 100.0f);
 
 
 
 		glBindVertexArray(VAO);
 
-		mat4 cubeModel = mat4(1.0f);
 		// cubeModel = translate(cubeModel, vec3(3.0f*cos(glfwGetTime()/3), 2.0f*sin(glfwGetTime()/3), 3.0f*sin(glfwGetTime()/3)));
-		cubeModel = translate(cubeModel, vec3(1.5f, 1.0f, -3.0f));
 
 		shader.setVec3("objColor", 1.0f, 0.5f, 0.0f);
 		shader.setVec3("eye", camera.Position);
+		shader.setF("material.shininess", 32.0f);
 
-		shader.setF("material.shininess", 64.0f);
+		shader.setVec3("dirLight.direction", -0.2f, -1.0f, -0.3f);	
+        shader.setVec3("dirLight.ambient", 0.05f, 0.05f, 0.05f);
+        shader.setVec3("dirLight.diffuse", 0.4f, 0.4f, 0.4f);
+        shader.setVec3("dirLight.specular", 0.5f, 0.5f, 0.5f);
+        // point light 1
+        shader.setVec3("pointLights[0].position", pointLightPositions[0]);
+        shader.setVec3("pointLights[0].ambient", pointLightPositions[1]/20.0f);
+        shader.setVec3("pointLights[0].diffuse", pointLightPositions[1]);
+        shader.setVec3("pointLights[0].specular", 1.0f, 1.0f, 1.0f);
+        shader.setF("pointLights[0].constant", 1.0f);
+        shader.setF("pointLights[0].linear", 0.09f);
+        shader.setF("pointLights[0].quadratic", 0.032f);
+        // point light 2
+        shader.setVec3("pointLights[1].position", pointLightPositions[2]);
+        shader.setVec3("pointLights[1].ambient", pointLightPositions[3]/20.0f);
+        shader.setVec3("pointLights[1].diffuse", pointLightPositions[3]);
+        shader.setVec3("pointLights[1].specular", 1.0f, 1.0f, 1.0f);
+        shader.setF("pointLights[1].constant", 1.0f);
+        shader.setF("pointLights[1].linear", 0.09f);
+        shader.setF("pointLights[1].quadratic", 0.032f);
+        // point light 3
+        shader.setVec3("pointLights[2].position", pointLightPositions[4]);
+        shader.setVec3("pointLights[2].ambient", pointLightPositions[5]/20.0f);
+        shader.setVec3("pointLights[2].diffuse", pointLightPositions[5]);
+        shader.setVec3("pointLights[2].specular", 1.0f, 1.0f, 1.0f);
+        shader.setF("pointLights[2].constant", 1.0f);
+        shader.setF("pointLights[2].linear", 0.09f);
+        shader.setF("pointLights[2].quadratic", 0.032f);
+        // point light 4
+        shader.setVec3("pointLights[3].position", pointLightPositions[6]);
+        shader.setVec3("pointLights[3].ambient", pointLightPositions[7]/20.0f);
+        shader.setVec3("pointLights[3].diffuse", pointLightPositions[7]);
+        shader.setVec3("pointLights[3].specular", 1.0f, 1.0f, 1.0f);
+        shader.setF("pointLights[3].constant", 1.0f);
+        shader.setF("pointLights[3].linear", 0.09f);
+        shader.setF("pointLights[3].quadratic", 0.032f);
+        // spotLight
+        shader.setVec3("spotlight.position", camera.Position);
+        shader.setVec3("spotlight.direction", camera.Front);
+        shader.setVec3("spotlight.ambient", 0.0f, 0.0f, 0.0f);
+        shader.setVec3("spotlight.diffuse", 1.0f, 1.0f, 1.0f);
+        shader.setVec3("spotlight.specular", 1.0f, 1.0f, 1.0f);
+        shader.setF("spotlight.constant", 1.0f);
+        shader.setF("spotlight.linear", 0.09f);
+        shader.setF("spotlight.quadratic", 0.032f);
+        shader.setF("spotlight.cutoffIn", cos(radians(12.5f)));
+        shader.setF("spotlight.cutoffOut", cos(radians(15.0f)));     
 
-		shader.setVec3("light.ambient", 0.2f, 0.2f, 0.2f);
-		shader.setVec3("light.diffuse", 0.5f, 0.5f, 0.5f);
-		shader.setVec3("light.specular", 1.0f, 1.0f, 1.0f);
-		shader.setVec3("light.position", lightPos);
 
 
 		shader.setMat4("view", view);
 		shader.setMat4("projection", projection);
-		shader.setMat4("model", cubeModel);
-		glDrawArrays(GL_TRIANGLES, 0, 36);
+
+
+		for (int i = 0; i < 10; i++) {
+			mat4 model = mat4(1.0f);
+            model = translate(model, cubePositions[i]);
+            float angle = 20.0f * i;
+            model = glm::rotate(model, radians(angle), vec3(1.0f, 0.3f, 0.5f));
+
+			shader.setMat4("model", model);
+
+			
+			glDrawArrays(GL_TRIANGLES, 0, 36);
+		}
 
 		lightShader.use();		
 		glBindVertexArray(lightVAO);
 
-		mat4 lightModel = mat4(1.0f);
-		lightModel = translate(lightModel, lightPos);
-
-		
 		lightShader.setMat4("view", view);
 		lightShader.setMat4("projection", projection);
-		lightShader.setMat4("model", lightModel);
+		
+		for (int i = 0; i < 8; i++) {
+			mat4 model = mat4(1.0f);
+			model = translate(model, pointLightPositions[i]);
+			i++;
+			lightShader.setMat4("model", model);
+			lightShader.setVec3("color", pointLightPositions[i]);
+			glDrawArrays(GL_TRIANGLES, 0, 36);
 
-
-		glDrawArrays(GL_TRIANGLES, 0, 36);
-
+		}
+		
 
 
 

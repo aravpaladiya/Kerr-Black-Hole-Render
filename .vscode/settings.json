@@ -9,5 +9,6 @@
         "*.vs": "glsl",
         "*.fs": "glsl"
     },
-    "cmake.configureOnOpen": false
+    "cmake.configureOnOpen": false,
+    "cmake.sourceDirectory": "C:/Users/aravp/source/vscode repos/GraphicsEngine/GraphicsEngine/include/glm"
 }
