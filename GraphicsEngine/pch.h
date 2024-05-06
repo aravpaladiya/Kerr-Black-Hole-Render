@@ -2,3 +2,12 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <iostream>
+#include <glad/glad.h>
+#include <string>
+#include <fstream>
+#include <sstream>
+#include <glfw3.h>
+#include <glfw3native.h>
+#include <stb_image.h>
+#include <assimp/config.h>
+

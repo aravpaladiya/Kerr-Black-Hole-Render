@@ -6,6 +6,8 @@ in vec3 normalsOut;
 uniform vec3 eye;
 uniform vec3 objColor;
 
+uniform bool flashlight;
+
 struct Material {
 	sampler2D diffuse;
 	sampler2D specular;
@@ -141,8 +143,10 @@ void main()
 	vec3 viewDir = pos-eye;
 
 	vec3 dirResult = calcDirLight(dirLight, n, viewDir);
-	vec3 spotResult = calcSpotlight(spotlight, n, pos, viewDir);
-	
+	vec3 spotResult = vec3(0.0, 0.0, 0.0);
+	if (flashlight) {
+		spotResult = calcSpotlight(spotlight, n, pos, viewDir);
+	} 
 	vec3 r = spotResult + dirResult;
 	for (int i = 0; i < 4; i++)
 		r += calcPointLight(pointLights[i], n, pos, viewDir);

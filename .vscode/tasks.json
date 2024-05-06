@@ -2,39 +2,47 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "label": "build",
             "type": "shell",
-            "command": "g++",
+            "label": "gcc: Precompile PCH",
+            "command": "gcc",
             "args": [
-                "-o",
-                "GraphicsEngine.exe",
-                "**.cpp",
-                "-I",
-                "C:/Users/aravp/OneDrive/Documents/Thirdpartylibraries/Include",
-                "-lGL",
-                "-lglfw",
-                "-lglew"
-            ]
+                "-x", "c++-header",
+                "-I${workspaceFolder}/GraphicsEngine/include",
+                "-o", "${workspaceFolder}/GraphicsEngine/pch.h.gch",  // Output .gch file in GraphicsEngine directory
+                "${workspaceFolder}/GraphicsEngine/pch.h"  // Path to pch.h header file
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "presentation": {
+                "reveal": "silent",
+                "panel": "dedicated"
+            },          
+            "problemMatcher": [],
+            "runOptions": {
+                "runOn": "folderOpen"
+            }
         },
         {
             "type": "cppbuild",
             "label": "C/C++: g++.exe build active file",
             "command": "C:\\msys64\\ucrt64\\bin\\g++.exe",
             "args": [
+                
                 "-fdiagnostics-color=always",
-                "-I${fileDirname}/include",
-                "-L${fileDirname}/lib",				
-                "${fileDirname}/\\*.cpp",				
-                "${fileDirname}/glad.c",
+                "-I${workspaceFolder}/GraphicsEngine/include",
+                "-L${workspaceFolder}/GraphicsEngine/lib",
+                // "-include", "${workspaceFolder}/GraphicsEngine/pch.h",  // Include precompiled header from GraphicsEngine directory
+                "${workspaceFolder}/GraphicsEngine/*.cpp",  // Source files in GraphicsEngine directory
+                "${workspaceFolder}/GraphicsEngine/glad.c",  // Path to glad.c
                 "-lglfw3dll",
                 "-lassimp",
-                "-o",
-                "${fileDirname}\\${fileBasenameNoExtension}.exe",
-                "-I",
-                "C:/Users/aravp/OneDrive/Documents/Thirdpartylibraries/Include"
+                "-o", "${workspaceFolder}/GraphicsEngine/${fileBasenameNoExtension}.exe",
+                "-I", "C:/Users/aravp/OneDrive/Documents/Thirdpartylibraries/Include"
             ],
             "options": {
-                "cwd": "${fileDirname}"
+                "cwd": "${workspaceFolder}/GraphicsEngine"
             },
             "problemMatcher": [
                 "$gcc"

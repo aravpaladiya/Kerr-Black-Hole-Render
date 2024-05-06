@@ -1,7 +1,4 @@
-#include <glad/glad.h>
-#include <GLFW/glfw3.h>
 #include "shader.h"
-#include "stb_image.h"
 #include "Camera.h"
 #include "pch.h"
 
@@ -13,12 +10,13 @@ int WIDTH = 800;
 int HEIGHT = 600;
 
 float lastFrame = 0.0f;
-float deltaTime = 0.0f;
+float deltaTime = 0.0f;	
 
 float lastX = WIDTH / 2;
 float lastY = HEIGHT / 2;
 bool firstMouse = true;
 
+bool flashLight = false;
 
 Camera camera = Camera(vec3(0.0f, 0.0f, 3.0f), vec3(0.0f, 1.0f, 0.0f));
 vec3 lightPos(1.2f, 1.0f, 2.0f);
@@ -63,6 +61,11 @@ void processInput(GLFWwindow* window) {
 	}
 	if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
 		camera.ProcessKeyboard(RIGHT, deltaTime);
+	}
+	if (glfwGetKey(window, GLFW_KEY_C) == GLFW_PRESS) {
+		flashLight = true;
+	} else {
+		flashLight = false;
 	}
 
 }
@@ -406,6 +409,7 @@ int main() {
 		shader.setMat4("view", view);
 		shader.setMat4("projection", projection);
 
+		shader.setB("flashlight", flashLight);
 
 		for (int i = 0; i < 10; i++) {
 			mat4 model = mat4(1.0f);
