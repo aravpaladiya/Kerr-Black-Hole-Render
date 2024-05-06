@@ -1,22 +1,25 @@
+#include "pch.h"
 #include "shader.h"
 #include "Camera.h"
-#include "pch.h"
 
 using namespace glm;
+
 
 bool userExternal = false;
 
 int WIDTH = 800;
 int HEIGHT = 600;
-
 float lastFrame = 0.0f;
 float deltaTime = 0.0f;	
+
 
 float lastX = WIDTH / 2;
 float lastY = HEIGHT / 2;
 bool firstMouse = true;
 
 bool flashLight = false;
+
+
 
 Camera camera = Camera(vec3(0.0f, 0.0f, 3.0f), vec3(0.0f, 1.0f, 0.0f));
 vec3 lightPos(1.2f, 1.0f, 2.0f);

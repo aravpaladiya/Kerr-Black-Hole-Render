@@ -27,7 +27,7 @@
     <ClCompile Include="stbimage.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="mathstructures.cpp">
+    <ClCompile Include="pch.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
