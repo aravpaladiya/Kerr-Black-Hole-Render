@@ -9,7 +9,3 @@
 #include <glfw3.h>
 #include <glfw3native.h>
 #include <stb_image.h>
-#include <assimp/config.h>
-#include <assimp/Importer.hpp>
-#include <assimp/scene.h>
-#include <assimp/postprocess.h>

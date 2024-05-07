@@ -20,7 +20,6 @@ bool firstMouse = true;
 bool flashLight = false;
 
 
-
 Camera camera = Camera(vec3(0.0f, 0.0f, 3.0f), vec3(0.0f, 1.0f, 0.0f));
 vec3 lightPos(1.2f, 1.0f, 2.0f);
 

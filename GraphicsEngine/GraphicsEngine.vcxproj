@@ -42,6 +42,8 @@
   <ItemGroup>
     <ClInclude Include="include\stb_image.h" />
     <ClInclude Include="mathstructures.h" />
+    <ClInclude Include="mesh_class.h" />
+    <ClInclude Include="Model.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="shader.h" />
   </ItemGroup>
