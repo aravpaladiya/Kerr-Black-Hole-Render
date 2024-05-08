@@ -85,4 +85,12 @@
       <Filter>Resource Files</Filter>
     </Image>
   </ItemGroup>
+  <ItemGroup>
+    <Text Include="withoutmodelengine.txt">
+      <Filter>Source Files</Filter>
+    </Text>
+    <Text Include="fragmentall.txt">
+      <Filter>Source Files</Filter>
+    </Text>
+  </ItemGroup>
 </Project>

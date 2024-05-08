@@ -53,6 +53,10 @@
     <Image Include="container2_specular.png" />
     <Image Include="wall.jpg" />
   </ItemGroup>
+  <ItemGroup>
+    <Text Include="fragmentall.txt" />
+    <Text Include="withoutmodelengine.txt" />
+  </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
