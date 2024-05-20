@@ -112,6 +112,32 @@ unsigned int loadTexture(char const * path)
     return tID;
 }
 
+unsigned int loadCubeMap(std::vector<string> paths) {
+	unsigned int texID;
+	glGenTextures(1, &texID);
+	glBindTexture(GL_TEXTURE_CUBE_MAP, texID);
+
+	int w, h, nrChannels;
+	for (int i = 0; i < 6; i++) {
+		unsigned char *data = stbi_load(paths[i].c_str(), &w, &h, &nrChannels, 0);
+		if (data) {
+			glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB, w, h, 0, GL_RGB, GL_UNSIGNED_BYTE, 0);
+		} else {
+			std::cout << "fail texture load" << paths[i] << std::endl;
+		}
+
+		stbi_image_free(data);
+	}
+
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+
+	return texID;
+}
+
 int main() {
 
 	glfwInit();
@@ -173,7 +199,17 @@ int main() {
 
 
 	//textures
-	texID = loadTexture("container.jpg");
+	std::vector<string> skyboxTextures;
+	{
+		"right.png",
+		"left.png",
+		"top.png",
+		"bottom.png",
+		"front.png", 
+		"back.png"
+	};
+	
+	texID = loadCubeMap(skyboxTextures);
 	
 
 	glBindVertexArray(0);
@@ -230,7 +266,7 @@ int main() {
 
 		glBindVertexArray(VAO);
 		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, texID);
+		glBindTexture(GL_TEXTURE_CUBE_MAP, texID);
 
 		shader.setVec3("camPos", camera.Position);
 		shader.setVec3("camDir", camera.Front);
@@ -245,6 +281,7 @@ int main() {
 		//actually display
 		glfwSwapBuffers(window);
 		glfwPollEvents();
+		
 	}
 
 	glDeleteBuffers(1, &VBO);

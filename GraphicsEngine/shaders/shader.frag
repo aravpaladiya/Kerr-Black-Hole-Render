@@ -10,7 +10,7 @@ uniform float WIDTH;
 uniform float HEIGHT;
 
 
-uniform sampler2D texture1;
+uniform samplerCube skybox;
 
 struct Ray {
 	vec3 pos;
@@ -44,7 +44,7 @@ vec3 calcColor(Ray ray) {
 	ray.dir = normalize(ray.dir);
 	ray.dir/=ray.dir.z;
 	
-	return texture(texture1, vec2(ray.dir.x, ray.dir.y)*0.5+0.5).xyz;
+	return texture(skybox, ray.dir).rgb;
 	
 } 
 
