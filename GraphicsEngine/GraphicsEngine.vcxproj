@@ -34,8 +34,8 @@
   <ItemGroup>
     <None Include="shaders\lightShader.fs" />
     <None Include="shaders\lightShader.vs" />
-    <None Include="shaders\shader.fs" />
-    <None Include="shaders\shader.vs" />
+    <None Include="shaders\shader.frag" />
+    <None Include="shaders\shader.vert" />
     <None Include="shaders\shadersOld.fs" />
     <None Include="shaders\shadersOld.vs" />
   </ItemGroup>
@@ -48,9 +48,21 @@
     <ClInclude Include="shader.h" />
   </ItemGroup>
   <ItemGroup>
+    <Image Include="..\..\..\..\Downloads\back.png" />
+    <Image Include="..\..\..\..\Downloads\bottom.png" />
+    <Image Include="..\..\..\..\Downloads\front.png" />
+    <Image Include="..\..\..\..\Downloads\left.png" />
+    <Image Include="..\..\..\..\Downloads\right.png" />
+    <Image Include="..\..\..\..\Downloads\top.png" />
+    <Image Include="back.png" />
+    <Image Include="bottom.png" />
     <Image Include="container.jpg" />
     <Image Include="container2.png" />
     <Image Include="container2_specular.png" />
+    <Image Include="front.png" />
+    <Image Include="left.png" />
+    <Image Include="right.png" />
+    <Image Include="top.png" />
     <Image Include="wall.jpg" />
   </ItemGroup>
   <ItemGroup>

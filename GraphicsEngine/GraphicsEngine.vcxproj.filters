@@ -38,10 +38,10 @@
     <None Include="shaders\lightShader.vs">
       <Filter>Source Files\shaders</Filter>
     </None>
-    <None Include="shaders\shader.fs">
+    <None Include="shaders\shader.frag">
       <Filter>Source Files\shaders</Filter>
     </None>
-    <None Include="shaders\shader.vs">
+    <None Include="shaders\shader.vert">
       <Filter>Source Files\shaders</Filter>
     </None>
     <None Include="shaders\shadersOld.fs">
@@ -82,6 +82,42 @@
       <Filter>Resource Files</Filter>
     </Image>
     <Image Include="container2_specular.png">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="..\..\..\..\Downloads\back.png">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="..\..\..\..\Downloads\bottom.png">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="..\..\..\..\Downloads\front.png">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="..\..\..\..\Downloads\left.png">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="..\..\..\..\Downloads\right.png">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="..\..\..\..\Downloads\top.png">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="back.png">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="bottom.png">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="front.png">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="left.png">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="right.png">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="top.png">
       <Filter>Resource Files</Filter>
     </Image>
   </ItemGroup>

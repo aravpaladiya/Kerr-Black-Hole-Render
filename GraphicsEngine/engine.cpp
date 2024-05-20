@@ -22,10 +22,11 @@ bool flashLight = false;
 
 
 Camera camera = Camera(vec3(0.0f, 0.0f, 3.0f), vec3(0.0f, 1.0f, 0.0f));
-vec3 lightPos(1.2f, 1.0f, 2.0f);
 
 //resize rendering window when window resized
 void framebuffer_size_callback(GLFWwindow* window, int width, int height) {
+	WIDTH = width;
+	HEIGHT = height;
 	glViewport(0, 0, width, height);
 }
 
@@ -65,10 +66,11 @@ void processInput(GLFWwindow* window) {
 	if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
 		camera.ProcessKeyboard(RIGHT, deltaTime);
 	}
-	if (glfwGetKey(window, GLFW_KEY_C) == GLFW_PRESS) {
-		flashLight = true;
-	} else {
-		flashLight = false;
+	if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) {
+		glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+	}
+	else {
+		glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 	}
 
 }
@@ -94,8 +96,8 @@ unsigned int loadTexture(char const * path)
         glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
         glGenerateMipmap(GL_TEXTURE_2D);
 
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
@@ -114,8 +116,8 @@ int main() {
 
 	glfwInit();
 	//version 3.3, core
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 	//init glfw
 	GLFWwindow* window = glfwCreateWindow(WIDTH, HEIGHT, "Learn", NULL, NULL);
@@ -137,22 +139,51 @@ int main() {
 	glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 	glfwSetCursorPosCallback(window, mouse_callback);
 	glfwSetScrollCallback(window, scroll_callback);
-	glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
 	std::string baPath = (userExternal ? "..\\..\\" : "..\\");
-	std::string verPath = baPath + "GraphicsEngine\\shaders\\shader.vs";
-	std::string fraPath = baPath + "GraphicsEngine\\shaders\\shader.fs";
-	std::string lVerPa = baPath + "GraphicsEngine\\shaders\\lightShader.vs";
-	std::string lFraPa = baPath + "GraphicsEngine\\shaders\\lightShader.fs";
+	std::string verPath = baPath + "GraphicsEngine\\shaders\\shader.vert";
+	std::string fraPath = baPath + "GraphicsEngine\\shaders\\shader.frag";
 	Shader shader(verPath.c_str(), fraPath.c_str());
-	Shader lightShader(lVerPa.c_str(), lFraPa.c_str());
+
+	float vertices[]{
+		//vertex				
+		-1.0f, -1.0f, 0.0f,		
+		1.0f, 1.0f, 0.0f,		
+		-1.0f, 1.0f, 0.0f,		
+		-1.0f, -1.0f, 0.0f,		
+		1.0f, 1.0f, 0.0f,		
+		1.0f, -1.0f, 0.0f
+	};
+
+	unsigned int VBO, VAO, texID;
+
+	//vao and vbo
+	glGenVertexArrays(1, &VAO);
+	glGenBuffers(1, &VBO);
+
+	glBindVertexArray(VAO);
+
+	glBindBuffer(GL_ARRAY_BUFFER, VBO);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 3, (void*)0);
+	glEnableVertexAttribArray(0);
 
 
+
+
+	//textures
+	texID = loadTexture("container.jpg");
+	
+
+	glBindVertexArray(0);
 	shader.use();
 
+	
+
 	glEnable(GL_DEPTH_TEST);
-	std::string path = "C:/Users/aravp/Downloads/backpack/backpack.obj";
-	Model ourModel(path);
+	/*std::string path = "C:/Users/aravp/Downloads/backpack/backpack.obj";
+	Model ourModel(path);*/
 
 
 
@@ -192,76 +223,23 @@ int main() {
 		glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-		
-	
 
 		//rendering code
 
 		shader.use();
 
+		glBindVertexArray(VAO);
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, texID);
 
-		int w, h;
-		glfwGetWindowSize(window, &w, &h);
+		shader.setVec3("camPos", camera.Position);
+		shader.setVec3("camDir", camera.Front);
+		shader.setVec3("camRight", camera.Right);
+		shader.setVec3("camUp", camera.Up);
+		shader.setF("WIDTH", WIDTH);
+		shader.setF("HEIGHT", HEIGHT);
 
-		mat4 view = camera.GetViewMatrix();
-
-		mat4 projection = perspective(radians(camera.Zoom), 
-		(float)w / (float)h, 0.1f, 100.0f);
-
-
-
-
-
-		shader.setVec3("objColor", 1.0f, 0.5f, 0.0f);
-		shader.setVec3("eye", camera.Position);
-		shader.setB("flashlight", flashLight);
-
-        shader.setVec3("pointLight.position", 0.0f, 0.0f, 0.0f);
-        shader.setVec3("pointLight.ambient", 0.1f, 0.1f, 0.1f);
-        shader.setVec3("pointLight.diffuse", 0.5f, 0.5f, 0.5f);
-        shader.setVec3("pointLight.specular", 1.0f, 1.0f, 1.0f);
-        shader.setF("pointLight.constant", 1.0f);
-        shader.setF("pointLight.linear", 0.09f);
-        shader.setF("pointLight.quadratic", 0.032f);
-
-		// spotLight
-		shader.setVec3("spotlight.position", camera.Position);
-		shader.setVec3("spotlight.direction", camera.Front);
-		shader.setVec3("spotlight.ambient", 0.0f, 0.0f, 0.0f);
-		shader.setVec3("spotlight.diffuse", 1.0f, 1.0f, 1.0f);
-		shader.setVec3("spotlight.specular", 1.0f, 1.0f, 1.0f);
-		shader.setF("spotlight.constant", 1.0f);
-		shader.setF("spotlight.linear", 0.09f);
-		shader.setF("spotlight.quadratic", 0.032f);
-		shader.setF("spotlight.cutoffIn", cos(radians(12.5f)));
-		shader.setF("spotlight.cutoffOut", cos(radians(15.0f)));
-
-        
-
-		shader.setMat4("view", view);
-		shader.setMat4("projection", projection);
-		mat4 model = glm::translate(mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f));
-		model = glm::scale(model, glm::vec3(1.0f, 1.0f, 1.0f));	
-
-		shader.setMat4("model", model);
-
-
-		ourModel.draw(shader);
-		
-
-		/*lightShader.use();		
-
-		lightShader.setMat4("view", view);
-		lightShader.setMat4("projection", projection);
-		
-		mat4 model = mat4(1.0f);
-		model = translate(model, vec3(0.0f, 0.0f, 4.0f));
-		
-		lightShader.setMat4("model", model);
-		lightShader.setVec3("color", 1.0f, 1.0f, 1.0f);
-
-		*/
-
+		glDrawArrays(GL_TRIANGLES, 0, 6);
 
 
 		//actually display
@@ -269,6 +247,8 @@ int main() {
 		glfwPollEvents();
 	}
 
+	glDeleteBuffers(1, &VBO);
+	glDeleteVertexArrays(1, &VAO);
 
 	glfwTerminate();
 	return 0;
