@@ -32,10 +32,10 @@ vec3 acceleration (float h2, vec3 pos) {
 }
 
 vec3 calcColor(Ray ray) {
-	float dt = 0.2;
+	float dt = 0.2;//higher means less accurate, but faster
 	ray.dir*=dt;
 	float h2 = sqMag(cross(ray.pos, ray.dir));
-	for (int i = 0; i < 150; i++) {
+	for (int i = 0; i < round((40/dt)); i++) {
 		ray.dir+=acceleration(h2, ray.pos);
 		ray.pos+=ray.dir;
 		if (sqMag(ray.pos)<=1) {//inside event horizon
@@ -54,6 +54,7 @@ vec3 calcColor(Ray ray) {
 
 void main()
 {	
+	//cast ray from camera position
 	Ray ray = Ray(camPos, camDir);
 	float fov = 90.0;
 	float x = pos.x*WIDTH/HEIGHT;

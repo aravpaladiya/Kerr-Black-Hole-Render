@@ -6,12 +6,11 @@
 using namespace glm;
 
 
-bool userExternal = false;
 
 const float PI = 3.14159265358979323846;
 
-int WIDTH = 3840;
-int HEIGHT = 2160;
+int WIDTH = 1920;
+int HEIGHT = 1080;
 float lastFrame = 0.0f;
 float deltaTime = 0.0f;	
 
@@ -20,7 +19,6 @@ float lastX = WIDTH / 2;
 float lastY = HEIGHT / 2;
 bool firstMouse = true;
 
-bool flashLight = false;
 
 
 Camera camera = Camera(vec3(0.0f, 0.0f, -7.0f), vec3(0.0f, 1.0f, 0.0f), vec3(0.0f, 0.0f, 1.0f));
@@ -28,7 +26,7 @@ Camera camera = Camera(vec3(0.0f, 0.0f, -7.0f), vec3(0.0f, 1.0f, 0.0f), vec3(0.0
 //resize rendering window when window resized
 void framebuffer_size_callback(GLFWwindow* window, int width, int height) {
 	WIDTH = width;
-	HEIGHT = height;
+	HEIGHT = height;//also update width and height variables for shader
 	glViewport(0, 0, width, height);
 }
 
@@ -170,12 +168,11 @@ int main() {
 	glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 	glfwSetCursorPosCallback(window, mouse_callback);
 	glfwSetScrollCallback(window, scroll_callback);
-
-	std::string baPath = (userExternal ? "..\\..\\" : "..\\");
-	std::string verPath = baPath + "GraphicsEngine\\shaders\\shader.vert";
-	std::string fraPath = baPath + "GraphicsEngine\\shaders\\shader.frag";
+	//init shader
+	std::string verPath = "shaders\\shader.vert";
+	std::string fraPath = "shaders\\shader.frag";
 	Shader shader(verPath.c_str(), fraPath.c_str());
-
+	//quad vertices
 	float vertices[]{
 		//vertex				
 		-1.0f, -1.0f, 0.0f,		
@@ -188,7 +185,7 @@ int main() {
 
 	unsigned int VBO, VAO, texID;
 
-	//vao and vbo
+	//vao and vbo for quad on screen
 	glGenVertexArrays(1, &VAO);
 	glGenBuffers(1, &VBO);
 
@@ -203,7 +200,7 @@ int main() {
 
 
 
-	//textures
+	//textures for skybox
 	std::vector<string> skyboxTextures
 	{
 		"right.png",
@@ -235,29 +232,14 @@ int main() {
 
 
 	*************************/
-	// int fts = 200 ; 
-	// float frameTimes[fts] = {0.0f};
-	// for (int i = 0; i < fts; i++) {
-	// 	frameTimes[fts] = 0;
-	// }
+
 
 	while (!glfwWindowShouldClose(window)) {
 
 		float currentFrame = glfwGetTime();
 		deltaTime = currentFrame - lastFrame;
 		lastFrame = currentFrame;
-		// float sum = 0;
-
-		// for (int i = 0; i < fts-1; i++) {
-		// 	frameTimes[i] = frameTimes[i+1];
-		// 	sum+=frameTimes[i];
-		// }
-		// frameTimes[fts] = 1/deltaTime;
-		// sum+=frameTimes[fts];
-		// sum/=fts;
-
-		// std::cout << sum << std::endl;
-		//std::cout << 1/deltaTime << std::endl;
+		//check for key presses and mouse movement
 		processInput(window);
 
 		//clear
@@ -273,14 +255,15 @@ int main() {
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_CUBE_MAP, texID);
 		if (true) {//view moves around black hole
-			float r = 7.0f;
+			float r = length(camera.Position);
 			float time = glfwGetTime();
-
-			float timeS = sin(0.1 * time);
-			float timeC = cos(0.1 * time);
+			float speed = 0.1;
+			float timeS = sin(speed * time);
+			float timeC = cos(speed * time);
 
 			camera.Position = vec3(r * timeC, 0.0f, -r * timeS);
-			camera.Yaw = -0.1 * time * 180 / PI - 180;
+			camera.Yaw = -speed * time * 180 / PI - 180;
+			camera.Pitch = 0;
 			if (camera.Yaw > 180) {
 				camera.Yaw -= 360;
 			}
@@ -291,7 +274,7 @@ int main() {
 		camera.updateCameraVectors();
 
 
-
+		//set uniforms
 		shader.setVec3("camPos", camera.Position);
 		shader.setVec3("camDir", camera.Front);
 		shader.setVec3("camRight", camera.Right);
@@ -303,12 +286,12 @@ int main() {
 		glDrawArrays(GL_TRIANGLES, 0, 6);
 
 
-		//actually display
+		//update buffers
 		glfwSwapBuffers(window);
 		glfwPollEvents();
 		
 	}
-
+	//cleanup
 	glDeleteBuffers(1, &VBO);
 	glDeleteVertexArrays(1, &VAO);
 
