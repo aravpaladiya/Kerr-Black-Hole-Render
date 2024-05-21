@@ -40,20 +40,16 @@
     <None Include="shaders\shadersOld.vs" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Camera.h" />
     <ClInclude Include="include\stb_image.h" />
     <ClInclude Include="mathstructures.h" />
     <ClInclude Include="mesh_class.h" />
     <ClInclude Include="Model.h" />
     <ClInclude Include="pch.h" />
+    <ClInclude Include="resource.h" />
     <ClInclude Include="shader.h" />
   </ItemGroup>
   <ItemGroup>
-    <Image Include="..\..\..\..\Downloads\back.png" />
-    <Image Include="..\..\..\..\Downloads\bottom.png" />
-    <Image Include="..\..\..\..\Downloads\front.png" />
-    <Image Include="..\..\..\..\Downloads\left.png" />
-    <Image Include="..\..\..\..\Downloads\right.png" />
-    <Image Include="..\..\..\..\Downloads\top.png" />
     <Image Include="back.png" />
     <Image Include="bottom.png" />
     <Image Include="container.jpg" />
@@ -68,6 +64,9 @@
   <ItemGroup>
     <Text Include="fragmentall.txt" />
     <Text Include="withoutmodelengine.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="GraphicsEngine.rc" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
@@ -168,6 +167,8 @@
       <AdditionalIncludeDirectories>C:\Users\aravp\source\vscode repos\GraphicsEngine\GraphicsEngine\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <Optimization>MaxSpeed</Optimization>
+      <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -186,13 +187,16 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <AdditionalIncludeDirectories>C:\Users\aravp\source\vscode repos\GraphicsEngine\GraphicsEngine\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>$(CoreLibraryDependencies);%(AdditionalDependencies);glfw3.lib;opengl32.lib</AdditionalDependencies>
+      <AdditionalDependencies>$(CoreLibraryDependencies);%(AdditionalDependencies);glfw3.lib;opengl32.lib;assimp-vc143-mtd.lib</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:\Users\aravp\source\vscode repos\GraphicsEngine\GraphicsEngine\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

@@ -8,8 +8,10 @@ using namespace glm;
 
 bool userExternal = false;
 
-int WIDTH = 800;
-int HEIGHT = 600;
+const float PI = 3.14159265358979323846;
+
+int WIDTH = 3840;
+int HEIGHT = 2160;
 float lastFrame = 0.0f;
 float deltaTime = 0.0f;	
 
@@ -21,7 +23,7 @@ bool firstMouse = true;
 bool flashLight = false;
 
 
-Camera camera = Camera(vec3(0.0f, 0.0f, 3.0f), vec3(0.0f, 1.0f, 0.0f));
+Camera camera = Camera(vec3(0.0f, 0.0f, -7.0f), vec3(0.0f, 1.0f, 0.0f), vec3(0.0f, 0.0f, 1.0f));
 
 //resize rendering window when window resized
 void framebuffer_size_callback(GLFWwindow* window, int width, int height) {
@@ -30,12 +32,12 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height) {
 	glViewport(0, 0, width, height);
 }
 
-void scroll_callback(GLFWwindow* window, double xoff, double yoff) {
+void scroll_callback(GLFWwindow* window, double xoff, double yoff) {//zoom (change fov)
 	camera.ProcessMouseScroll(yoff);
 }
 
-void mouse_callback(GLFWwindow* window, double xpos, double ypos) {
-	if (firstMouse) {
+void mouse_callback(GLFWwindow* window, double xpos, double ypos) {//turn camera
+	if (firstMouse) {//to account for first mouse movement having large offset
 		lastX = xpos;
 		lastY = ypos;
 		firstMouse = false;
@@ -54,6 +56,7 @@ void processInput(GLFWwindow* window) {
 	if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
 		glfwSetWindowShouldClose(window, true);
 	}
+	//camera movement
 	if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
 		camera.ProcessKeyboard(FORWARD, deltaTime);
 	}
@@ -66,6 +69,7 @@ void processInput(GLFWwindow* window) {
 	if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
 		camera.ProcessKeyboard(RIGHT, deltaTime);
 	}
+	//display cursor when space pressed
 	if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) {
 		glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
 	}
@@ -75,7 +79,7 @@ void processInput(GLFWwindow* window) {
 
 }
 
-unsigned int loadTexture(char const * path)
+unsigned int loadTexture(char const * path) //returns ID for texture stored
 {
     unsigned int tID;
     glGenTextures(1, &tID);
@@ -112,18 +116,19 @@ unsigned int loadTexture(char const * path)
     return tID;
 }
 
-unsigned int loadCubeMap(std::vector<string> paths) {
+unsigned int loadCubeMap(std::vector<string> faces) {//returns ID for the cubemap stored
 	unsigned int texID;
 	glGenTextures(1, &texID);
 	glBindTexture(GL_TEXTURE_CUBE_MAP, texID);
 
-	int w, h, nrChannels;
+	int w, h, c;
 	for (int i = 0; i < 6; i++) {
-		unsigned char *data = stbi_load(paths[i].c_str(), &w, &h, &nrChannels, 0);
+		unsigned char *data = stbi_load(faces[i].c_str(), &w, &h, &c, 0);
+		std::cout << data;
 		if (data) {
-			glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB, w, h, 0, GL_RGB, GL_UNSIGNED_BYTE, 0);
+			glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB, w, h, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
 		} else {
-			std::cout << "fail texture load" << paths[i] << std::endl;
+			std::cout << "fail texture load" << faces[i] << std::endl;
 		}
 
 		stbi_image_free(data);
@@ -141,7 +146,7 @@ unsigned int loadCubeMap(std::vector<string> paths) {
 int main() {
 
 	glfwInit();
-	//version 3.3, core
+	//version 4.6, core
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
@@ -199,13 +204,13 @@ int main() {
 
 
 	//textures
-	std::vector<string> skyboxTextures;
+	std::vector<string> skyboxTextures
 	{
 		"right.png",
 		"left.png",
 		"top.png",
 		"bottom.png",
-		"front.png", 
+		"front.png",
 		"back.png"
 	};
 	
@@ -215,7 +220,7 @@ int main() {
 	glBindVertexArray(0);
 	shader.use();
 
-	
+	shader.setI("skybox", 0);
 
 	glEnable(GL_DEPTH_TEST);
 	/*std::string path = "C:/Users/aravp/Downloads/backpack/backpack.obj";
@@ -250,7 +255,7 @@ int main() {
 		// frameTimes[fts] = 1/deltaTime;
 		// sum+=frameTimes[fts];
 		// sum/=fts;
-		
+
 		// std::cout << sum << std::endl;
 		//std::cout << 1/deltaTime << std::endl;
 		processInput(window);
@@ -267,13 +272,33 @@ int main() {
 		glBindVertexArray(VAO);
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_CUBE_MAP, texID);
+		if (true) {//view moves around black hole
+			float r = 7.0f;
+			float time = glfwGetTime();
+
+			float timeS = sin(0.1 * time);
+			float timeC = cos(0.1 * time);
+
+			camera.Position = vec3(r * timeC, 0.0f, -r * timeS);
+			camera.Yaw = -0.1 * time * 180 / PI - 180;
+			if (camera.Yaw > 180) {
+				camera.Yaw -= 360;
+			}
+			if (camera.Yaw < -180) {
+				camera.Yaw += 360;
+			}
+		}
+		camera.updateCameraVectors();
+
+
 
 		shader.setVec3("camPos", camera.Position);
 		shader.setVec3("camDir", camera.Front);
 		shader.setVec3("camRight", camera.Right);
-		shader.setVec3("camUp", camera.Up);
+		shader.setVec3("camUp", camera.Up); 
 		shader.setF("WIDTH", WIDTH);
 		shader.setF("HEIGHT", HEIGHT);
+		shader.setMat4("lookat", glm::lookAt(camera.Position, camera.Position+camera.Front, camera.Up));
 
 		glDrawArrays(GL_TRIANGLES, 0, 6);
 

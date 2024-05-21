@@ -9,6 +9,9 @@ uniform vec3 camDir;
 uniform float WIDTH;
 uniform float HEIGHT;
 
+uniform mat4 lookat;
+
+
 
 uniform samplerCube skybox;
 
@@ -22,27 +25,27 @@ float sqMag(vec3 v) {
 }
 
 vec3 acceleration (float h2, vec3 pos) {
+	//this does not describe the real motion of the photon, but it does give an equivalent trajectory.
 	float r5 = pow(sqMag(pos), 2.5);
 	return -1.5*h2*pos/r5;
+	
 }
 
 vec3 calcColor(Ray ray) {
-	float dt = 0.1;
+	float dt = 0.2;
 	ray.dir*=dt;
 	float h2 = sqMag(cross(ray.pos, ray.dir));
-	for (int i = 0; i < 300; i++) {
+	for (int i = 0; i < 150; i++) {
 		ray.dir+=acceleration(h2, ray.pos);
 		ray.pos+=ray.dir;
-		if (sqMag(ray.pos)<=1) {
-			return vec3(0.0);
-
+		if (sqMag(ray.pos)<=1) {//inside event horizon
+			return vec3(0.0, 0.0, 0.0);
 		}
-
 
 	}
 
-	ray.dir = normalize(ray.dir);
-	ray.dir/=ray.dir.z;
+//	ray.dir = normalize(ray.dir);
+//	ray.dir/=ray.dir.z;
 	
 	return texture(skybox, ray.dir).rgb;
 	
@@ -56,7 +59,8 @@ void main()
 	float x = pos.x*WIDTH/HEIGHT;
 	float y = pos.y;
 
-	ray.dir = normalize(vec3(x, y, 1));
+	ray.dir = normalize(mat3(camRight, camUp, camDir) * vec3(x, y, 1));
+	
 	FragColor = vec4(calcColor(ray), 1.0);
 }
 
