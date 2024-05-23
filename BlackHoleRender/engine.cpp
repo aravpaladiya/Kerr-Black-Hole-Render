@@ -254,7 +254,7 @@ int main() {
 		glBindVertexArray(VAO);
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_CUBE_MAP, texID);
-		if (true) {//view moves around black hole
+		if (false) {//view moves around black hole
 			float r = length(camera.Position);
 			float time = glfwGetTime();
 			float speed = 0.1;
