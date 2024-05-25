@@ -50,6 +50,7 @@
     <None Include="shaders\shadersOld.vs">
       <Filter>Source Files\shaders</Filter>
     </None>
+    <None Include="shaders\ray.comp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="mathstructures.h">

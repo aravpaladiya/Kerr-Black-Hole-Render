@@ -18,8 +18,12 @@ float deltaTime = 0.0f;
 float lastX = WIDTH / 2;
 float lastY = HEIGHT / 2;
 bool firstMouse = true;
+#define PATH_STEPS 300
+struct RayPath {
 
-
+	vec3 origins[PATH_STEPS];
+	vec3 directions[PATH_STEPS];
+};
 
 Camera camera = Camera(vec3(0.0f, 0.0f, -7.0f), vec3(0.0f, 1.0f, 0.0f), vec3(0.0f, 0.0f, 1.0f));
 
@@ -75,6 +79,55 @@ void processInput(GLFWwindow* window) {
 		glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 	}
 
+}
+
+unsigned int createCompute(const char* p) {
+	std::string computeCode;
+	std::ifstream cShaderFile;
+
+	cShaderFile.exceptions(std::ifstream::failbit | std::ifstream::badbit);
+	try
+	{
+
+		cShaderFile.open(p);
+		std::stringstream cShaderStream;
+
+		cShaderStream << cShaderFile.rdbuf();
+
+		cShaderFile.close();
+
+		computeCode = cShaderStream.str();
+	}
+	catch (std::ifstream::failure& e)
+	{
+		std::cout << "ERROR::SHADER::FILE_NOT_SUCCESSFULLY_READ: " << e.what() << std::endl;
+	}
+	const char* cShaderCode = computeCode.c_str();
+
+	unsigned int compute;
+
+
+	compute = glCreateShader(GL_COMPUTE_SHADER);
+	glShaderSource(compute, 1, &cShaderCode, NULL);
+	glCompileShader(compute);
+	int success;
+	char infoLog[512];
+
+	unsigned int ID = glCreateProgram();
+	glAttachShader(ID, compute);
+	glLinkProgram(ID);
+
+	glGetShaderiv(compute, GL_COMPILE_STATUS, &success);
+	if (!success)
+	{
+		glGetShaderInfoLog(compute, 512, NULL, infoLog);
+		std::cout << "ERROR::SHADER::COMPUTE::COMPILATION_FAILED\n" << infoLog << std::endl;
+	}
+	
+	
+	glDeleteShader(compute);
+
+	return ID;
 }
 
 unsigned int loadTexture(char const * path) //returns ID for texture stored
@@ -171,6 +224,7 @@ int main() {
 	//init shader
 	std::string verPath = "shaders\\shader.vert";
 	std::string fraPath = "shaders\\shader.frag";
+	std::string compPath = "shaders\\ray.comp";
 	Shader shader(verPath.c_str(), fraPath.c_str());
 	//quad vertices
 	float vertices[]{
@@ -197,9 +251,22 @@ int main() {
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 3, (void*)0);
 	glEnableVertexAttribArray(0);
 
+	//comp shader for rays
+	int numRays = std::max(WIDTH, HEIGHT);
+	unsigned int raySSBO;
+	glGenBuffers(1, &raySSBO);
+	glBindBuffer(GL_SHADER_STORAGE_BUFFER, raySSBO);
+
+	glBufferData(GL_SHADER_STORAGE_BUFFER, numRays * sizeof(RayPath), nullptr, GL_DYNAMIC_DRAW);
+
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, raySSBO);
 
 
 
+	unsigned int compProgram = createCompute(compPath.c_str());
+	
+
+	
 	//textures for skybox
 	std::vector<string> skyboxTextures
 	{
@@ -220,10 +287,7 @@ int main() {
 	shader.setI("skybox", 0);
 
 	glEnable(GL_DEPTH_TEST);
-	/*std::string path = "C:/Users/aravp/Downloads/backpack/backpack.obj";
-	Model ourModel(path);*/
-
-
+	
 
 	/************************
 
@@ -245,7 +309,20 @@ int main() {
 		//clear
 		glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		
+		//precalculate ray paths along equatorial plane
+		glUseProgram(compProgram);
+		
+		glUniform1f(glGetUniformLocation(compProgram, "WIDTH"), WIDTH);
+		glUniform1f(glGetUniformLocation(compProgram, "HEIGHT"), HEIGHT);
+		glUniform3fv(glGetUniformLocation(compProgram, "camPos"), 1, value_ptr(camera.Position));
+		glUniform3fv(glGetUniformLocation(compProgram, "camDir"), 1, value_ptr(camera.Front));
+		glUniform3fv(glGetUniformLocation(compProgram, "camRight"), 1, value_ptr(camera.Right));
+		glUniform3fv(glGetUniformLocation(compProgram, "camUp"), 1, value_ptr(camera.Up));
 
+		glUniform1i(glGetUniformLocation(compProgram, "STEPS"), PATH_STEPS);
+		glDispatchCompute(numRays, 1, 1);
+		glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 
 		//rendering code
 

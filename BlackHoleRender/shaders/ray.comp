@@ -1,6 +1,4 @@
 #version 460 core
-out vec4 FragColor;
-in vec3 pos;
 uniform vec3 camPos;
 uniform vec3 camRight;
 uniform vec3 camUp;
@@ -9,24 +7,21 @@ uniform vec3 camDir;
 uniform float WIDTH;
 uniform float HEIGHT;
 
-
-float sqDiskIn = 5;
-float sqDiskOut = 16;
-
-uniform samplerCube skybox;
+uniform int STEPS;
 #define steps 300
+struct Ray {
+	vec3 pos;
+	vec3 dir;
+};
+
 struct RayPath {
 	vec3 pos[steps];
 	vec3 dir[steps];
 };
 
+layout(local_size_x = 1) in;
 layout(std430, binding = 0) buffer RayPathBuffer {
-	 RayPath rayPaths[];
-};
-
-struct Ray {
-	vec3 pos;
-	vec3 dir;
+	RayPath rayPaths[];
 };
 
 float sqMag(vec3 v) {
@@ -69,48 +64,32 @@ Ray rungekutta(float h2, Ray ray, float h) {
 }
 
 
-
-vec3 calcColor(Ray ray) {
-	Ray prevRay = ray;
-
-	float dt = 0.2;//higher means less accurate, but faster
-	float h2 = sqMag(cross(ray.pos, ray.dir));
-	//float t = 4*length(ray.pos)*1/dt;
-	for (int i = 0; i < round(40/dt); i++) {
-		prevRay = ray;
-		ray+=rungekutta(h2, ray, dt);
-		if (sqMag(ray.pos)<=1) {//inside event horizon
-			return vec3(0.0, 0.0, 1.0);
-		}
-
-		if ((prevRay.pos.y>0 && ray.pos.y<0) || (prevRay.pos.y<0 && ray.pos.y>0)) {
-			float zs = -prevRay.pos.y/(ray.pos.y-prevRay.pos.y);
-			float mag = sqMag(prevRay.pos.xz+zs*(ray.pos.xz-prevRay.pos.xz));
-			if(sqDiskIn < mag && mag < sqDiskOut) {
-				return vec3(1.0, 0.0, 0.0);
-			}
-		}
-
-	}
-
-//	ray.dir = normalize(ray.dir);
-//	ray.dir/=ray.dir.z;
-	
-	return texture(skybox, ray.dir).rgb;
-	
-} 
+void main() {
+	uint index = gl_GlobalInvocationID.x;
 
 
-void main()
-{	
-	//cast ray from camera position
 	Ray ray = Ray(camPos, camDir);
 	float fov = 90.0;
-	float x = pos.x*WIDTH/HEIGHT;
-	float y = pos.y;
+	float x = float(index)/WIDTH -0.5;
+	x*= WIDTH/HEIGHT;
+	float y = 0;
 
 	ray.dir = normalize(mat3(camRight, camUp, camDir) * vec3(x, y, 1));
-	
-	FragColor = vec4(texture(skybox, rayPaths[uint(gl_FragCoord.x)].dir[299]).rgb, 1.0);
+	for (int i = 0; i < STEPS; i++) {
+		float dt = 40/STEPS;//higher means less accurate, but further
+		float h2 = sqMag(cross(ray.pos, ray.dir));
+		ray+=rungekutta(h2, ray, dt);
+		if (sqMag(ray.pos)<=1) {//inside event horizon
+			for (int j = i; j < STEPS; j++) {
+				rayPaths[index].pos[j] = ray.pos;
+				rayPaths[index].dir[j] = ray.dir;
+				
+			}
+			return;
+		}
+
+		rayPaths[index].pos[i] = ray.pos;
+		rayPaths[index].dir[i] = ray.dir;
+	}
 }
 
