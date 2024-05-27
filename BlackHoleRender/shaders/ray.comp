@@ -59,7 +59,7 @@ Ray rungekutta(float h2, Ray ray, float h) {
 	k4 = ray.dir + h*l3;
 	l4 = acc(h2, h*k3+ray.pos);
 
-	return Ray(h/6*(k1+2*k2+2*k3+k4), h/6*(l1+2*l2+2*l3+l4));
+	return Ray(ray.pos+h/6*(k1+2*k2+2*k3+k4), ray.dir+h/6*(l1+2*l2+2*l3+l4));
 	
 }
 
@@ -67,22 +67,27 @@ Ray rungekutta(float h2, Ray ray, float h) {
 void main() {
 	uint index = gl_GlobalInvocationID.x;
 
-
+	
 	Ray ray = Ray(camPos, camDir);
 	float fov = 90.0;
 	float x = float(index)/WIDTH -0.5;
-	x*= WIDTH/HEIGHT;
+	x*= 2*WIDTH/HEIGHT;
 	float y = 0;
 
 	ray.dir = normalize(mat3(camRight, camUp, camDir) * vec3(x, y, 1));
-	for (int i = 0; i < STEPS; i++) {
-		float dt = 40/STEPS;//higher means less accurate, but further
-		float h2 = sqMag(cross(ray.pos, ray.dir));
-		ray+=rungekutta(h2, ray, dt);
+	Ray prevRay = ray;
+	rayPaths[index].pos[0] = ray.pos;
+	rayPaths[index].dir[0] = ray.dir;
+	float h2 = sqMag(cross(ray.pos, ray.dir));
+	float dt = float(40)/steps;//higher means less accurate, but further
+
+	for (int i = 1; i < steps; i++) {
+		prevRay = ray;
+		ray=rungekutta(h2, prevRay, dt);
 		if (sqMag(ray.pos)<=1) {//inside event horizon
-			for (int j = i; j < STEPS; j++) {
-				rayPaths[index].pos[j] = ray.pos;
-				rayPaths[index].dir[j] = ray.dir;
+			for (int j = i; j < steps; j++) {
+				rayPaths[index].pos[j] = vec3(0);
+				rayPaths[index].dir[j] = vec3(0);
 				
 			}
 			return;
@@ -90,6 +95,10 @@ void main() {
 
 		rayPaths[index].pos[i] = ray.pos;
 		rayPaths[index].dir[i] = ray.dir;
+		
+				
+
+		
 	}
 }
 

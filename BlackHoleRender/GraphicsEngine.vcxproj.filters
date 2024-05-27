@@ -109,6 +109,24 @@
     <Image Include="top.png">
       <Filter>Resource Files</Filter>
     </Image>
+    <Image Include="skyboxtest\back.png">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="skyboxtest\bottom.png">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="skyboxtest\front.png">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="skyboxtest\left.png">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="skyboxtest\right.png">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="skyboxtest\top.png">
+      <Filter>Resource Files</Filter>
+    </Image>
   </ItemGroup>
   <ItemGroup>
     <Text Include="withoutmodelengine.txt">

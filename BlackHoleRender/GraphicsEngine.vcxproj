@@ -59,6 +59,12 @@
     <Image Include="front.png" />
     <Image Include="left.png" />
     <Image Include="right.png" />
+    <Image Include="skyboxtest\back.png" />
+    <Image Include="skyboxtest\bottom.png" />
+    <Image Include="skyboxtest\front.png" />
+    <Image Include="skyboxtest\left.png" />
+    <Image Include="skyboxtest\right.png" />
+    <Image Include="skyboxtest\top.png" />
     <Image Include="top.png" />
     <Image Include="wall.jpg" />
   </ItemGroup>

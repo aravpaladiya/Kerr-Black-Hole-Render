@@ -19,10 +19,13 @@ float lastX = WIDTH / 2;
 float lastY = HEIGHT / 2;
 bool firstMouse = true;
 #define PATH_STEPS 300
-struct RayPath {
+struct RayPathPad {
 
-	vec3 origins[PATH_STEPS];
-	vec3 directions[PATH_STEPS];
+};
+struct alignas(16) RayPath {
+
+	glm::vec3 origins[PATH_STEPS];
+	glm::vec3 directions[PATH_STEPS];
 };
 
 Camera camera = Camera(vec3(0.0f, 0.0f, -7.0f), vec3(0.0f, 1.0f, 0.0f), vec3(0.0f, 0.0f, 1.0f));
@@ -175,7 +178,6 @@ unsigned int loadCubeMap(std::vector<string> faces) {//returns ID for the cubema
 	int w, h, c;
 	for (int i = 0; i < 6; i++) {
 		unsigned char *data = stbi_load(faces[i].c_str(), &w, &h, &c, 0);
-		std::cout << data;
 		if (data) {
 			glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB, w, h, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
 		} else {
@@ -256,8 +258,8 @@ int main() {
 	unsigned int raySSBO;
 	glGenBuffers(1, &raySSBO);
 	glBindBuffer(GL_SHADER_STORAGE_BUFFER, raySSBO);
-
-	glBufferData(GL_SHADER_STORAGE_BUFFER, numRays * sizeof(RayPath), nullptr, GL_DYNAMIC_DRAW);
+	//add 8 bytes per ray for padding
+	glBufferData(GL_SHADER_STORAGE_BUFFER, numRays * (sizeof(RayPath) + 8*PATH_STEPS), nullptr, GL_DYNAMIC_DRAW);
 
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, raySSBO);
 
@@ -268,14 +270,15 @@ int main() {
 
 	
 	//textures for skybox
+	std::string skysubpath = "";
 	std::vector<string> skyboxTextures
 	{
-		"right.png",
-		"left.png",
-		"top.png",
-		"bottom.png",
-		"front.png",
-		"back.png"
+		skysubpath + "right.png",
+		skysubpath + "left.png",
+		skysubpath + "top.png",
+		skysubpath + "bottom.png",
+		skysubpath + "front.png",
+		skysubpath + "back.png"
 	};
 	
 	texID = loadCubeMap(skyboxTextures);
@@ -289,13 +292,11 @@ int main() {
 	glEnable(GL_DEPTH_TEST);
 	
 
-	/************************
+	/**
 
+		RENDER LOOP
 
-		   RENDER LOOP
-
-
-	*************************/
+	**/
 
 
 	while (!glfwWindowShouldClose(window)) {
@@ -305,22 +306,23 @@ int main() {
 		lastFrame = currentFrame;
 		//check for key presses and mouse movement
 		processInput(window);
-
-		//clear
+ 		//clear
 		glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		
 		//precalculate ray paths along equatorial plane
 		glUseProgram(compProgram);
 		
-		glUniform1f(glGetUniformLocation(compProgram, "WIDTH"), WIDTH);
-		glUniform1f(glGetUniformLocation(compProgram, "HEIGHT"), HEIGHT);
+		glUniform1f(glGetUniformLocation(compProgram, "WIDTH"), static_cast<float>(WIDTH));
+		glUniform1f(glGetUniformLocation(compProgram, "HEIGHT"), static_cast<float>(HEIGHT));
 		glUniform3fv(glGetUniformLocation(compProgram, "camPos"), 1, value_ptr(camera.Position));
 		glUniform3fv(glGetUniformLocation(compProgram, "camDir"), 1, value_ptr(camera.Front));
 		glUniform3fv(glGetUniformLocation(compProgram, "camRight"), 1, value_ptr(camera.Right));
 		glUniform3fv(glGetUniformLocation(compProgram, "camUp"), 1, value_ptr(camera.Up));
 
-		glUniform1i(glGetUniformLocation(compProgram, "STEPS"), PATH_STEPS);
+		glUniform1i(glGetUniformLocation(compProgram, "STEPS"), PATH_STEPS); 
+		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, raySSBO);
+
 		glDispatchCompute(numRays, 1, 1);
 		glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 
@@ -348,7 +350,7 @@ int main() {
 				camera.Yaw += 360;
 			}
 		}
-		camera.updateCameraVectors();
+		//camera.updateCameraVectors();
 
 
 		//set uniforms
@@ -356,9 +358,8 @@ int main() {
 		shader.setVec3("camDir", camera.Front);
 		shader.setVec3("camRight", camera.Right);
 		shader.setVec3("camUp", camera.Up); 
-		shader.setF("WIDTH", WIDTH);
-		shader.setF("HEIGHT", HEIGHT);
-		shader.setMat4("lookat", glm::lookAt(camera.Position, camera.Position+camera.Front, camera.Up));
+		shader.setF("WIDTH", static_cast<float>(WIDTH));
+		shader.setF("HEIGHT", static_cast<float>(HEIGHT));
 
 		glDrawArrays(GL_TRIANGLES, 0, 6);
 
