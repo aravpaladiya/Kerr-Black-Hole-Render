@@ -9,10 +9,10 @@ using namespace glm;
 
 const float PI = 3.14159265358979323846;
 
-int WIDTH = 1920;
-int HEIGHT = 1080;
+int WIDTH = 800;
+int HEIGHT = 600;
 float lastFrame = 0.0f;
-float deltaTime = 0.0f;	
+float deltaTime = 0.03f;	
 
 
 float lastX = WIDTH / 2;
@@ -57,7 +57,6 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos) {//turn camera
 
 void processInput(GLFWwindow* window) {
 	//close on esc press
-
 	if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
 		glfwSetWindowShouldClose(window, true);
 	}
@@ -254,7 +253,7 @@ int main() {
 	glEnableVertexAttribArray(0);
 
 	//comp shader for rays
-	int numRays = std::max(WIDTH, HEIGHT);
+	int numRays = 10*std::max(WIDTH, HEIGHT);
 	unsigned int raySSBO;
 	glGenBuffers(1, &raySSBO);
 	glBindBuffer(GL_SHADER_STORAGE_BUFFER, raySSBO);
@@ -298,12 +297,17 @@ int main() {
 
 	**/
 
-
+	float lastTime = int(glfwGetTime());
+	int numFrames = 0;
 	while (!glfwWindowShouldClose(window)) {
-
-		float currentFrame = glfwGetTime();
-		deltaTime = currentFrame - lastFrame;
-		lastFrame = currentFrame;
+		numFrames++;
+		float currentTime = int(glfwGetTime());
+		
+		if (currentTime > lastTime) {
+			std::cout << numFrames << std::endl;
+			numFrames = 0;
+			lastTime = currentTime;
+		}
 		//check for key presses and mouse movement
 		processInput(window);
  		//clear
@@ -321,6 +325,7 @@ int main() {
 		glUniform3fv(glGetUniformLocation(compProgram, "camUp"), 1, value_ptr(camera.Up));
 
 		glUniform1i(glGetUniformLocation(compProgram, "STEPS"), PATH_STEPS); 
+		glUniform1i(glGetUniformLocation(compProgram, "TOTALCALLS"), numRays);
 		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, raySSBO);
 
 		glDispatchCompute(numRays, 1, 1);
@@ -350,7 +355,7 @@ int main() {
 				camera.Yaw += 360;
 			}
 		}
-		//camera.updateCameraVectors();
+		camera.updateCameraVectors();
 
 
 		//set uniforms
@@ -360,6 +365,7 @@ int main() {
 		shader.setVec3("camUp", camera.Up); 
 		shader.setF("WIDTH", static_cast<float>(WIDTH));
 		shader.setF("HEIGHT", static_cast<float>(HEIGHT));
+		shader.setI("TOTALCALLS", numRays);
 
 		glDrawArrays(GL_TRIANGLES, 0, 6);
 
