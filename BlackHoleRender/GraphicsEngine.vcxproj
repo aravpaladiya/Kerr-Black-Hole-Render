@@ -32,13 +32,9 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <None Include="shaders\lightShader.fs" />
-    <None Include="shaders\lightShader.vs" />
     <None Include="shaders\ray.comp" />
     <None Include="shaders\shader.frag" />
     <None Include="shaders\shader.vert" />
-    <None Include="shaders\shadersOld.fs" />
-    <None Include="shaders\shadersOld.vs" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Camera.h" />

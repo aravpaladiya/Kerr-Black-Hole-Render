@@ -32,22 +32,10 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <None Include="shaders\lightShader.fs">
-      <Filter>Source Files\shaders</Filter>
-    </None>
-    <None Include="shaders\lightShader.vs">
-      <Filter>Source Files\shaders</Filter>
-    </None>
     <None Include="shaders\shader.frag">
       <Filter>Source Files\shaders</Filter>
     </None>
     <None Include="shaders\shader.vert">
-      <Filter>Source Files\shaders</Filter>
-    </None>
-    <None Include="shaders\shadersOld.fs">
-      <Filter>Source Files\shaders</Filter>
-    </None>
-    <None Include="shaders\shadersOld.vs">
       <Filter>Source Files\shaders</Filter>
     </None>
     <None Include="shaders\ray.comp" />

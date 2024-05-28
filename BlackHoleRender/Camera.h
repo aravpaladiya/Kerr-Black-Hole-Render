@@ -7,7 +7,9 @@ enum Camera_Movement {
     FORWARD,
     BACKWARD,
     LEFT,
-    RIGHT
+    RIGHT,
+    UP,
+    DOWN
 };
 
 const float YAW = 90.0f;
@@ -17,8 +19,7 @@ const float SENSITIVITY = 0.1f;
 const float ZOOM = 45.0f;
 
 
-class Camera
-{
+class Camera {
 public:
     glm::vec3 Position;
     glm::vec3 Front;
@@ -33,9 +34,8 @@ public:
     float MouseSensitivity;
     float Zoom;
 
-    // constructor with vectors
-    Camera(glm::vec3 position, glm::vec3 up, glm::vec3 front) : MovementSpeed(SPEED), MouseSensitivity(SENSITIVITY), Zoom(ZOOM)
-    {
+    //constructor with vectors
+    Camera(glm::vec3 position, glm::vec3 up, glm::vec3 front) : MovementSpeed(SPEED), MouseSensitivity(SENSITIVITY), Zoom(ZOOM) {
         Position = position;
         WorldUp = up;
         Front = front;
@@ -45,47 +45,46 @@ public:
     }
 
 
-    glm::mat4 GetViewMatrix()
-    {
+    glm::mat4 GetViewMatrix() {
         //std::cout << Front.x << " " << Front.y << " " << Front.z << std::endl;
 
         return glm::lookAt(Position, Position + Front, Up);
     }
 
-    void ProcessKeyboard(Camera_Movement direction, float deltaTime)
-    {
+    void ProcessKeyboard(Camera_Movement direction, float deltaTime) {
         float velocity = MovementSpeed * deltaTime;
         if (direction == FORWARD)
-            Position += Front * velocity;
+            Position += normalize(cross(WorldUp, Right)) * velocity;
         if (direction == BACKWARD)
-            Position -= Front * velocity;
+            Position -= normalize(cross(WorldUp, Right)) * velocity;
         if (direction == LEFT)
             Position -= Right * velocity;
         if (direction == RIGHT)
             Position += Right * velocity;
+        if (direction == UP)
+            Position += WorldUp * velocity;
+        if (direction == DOWN)
+            Position -= WorldUp * velocity;
     }
 
-    void ProcessMouseMovement(float xoffset, float yoffset, GLboolean constrainPitch = true)
-    {
+    void ProcessMouseMovement(float xoffset, float yoffset, GLboolean constrainPitch = true) {
         xoffset *= MouseSensitivity;
         yoffset *= MouseSensitivity;
 
         Yaw += xoffset;
         Pitch += yoffset;
 
-        if (constrainPitch)
-        {
-            if (Pitch > 89.0f)
-                Pitch = 89.0f;
-            if (Pitch < -89.0f)
-                Pitch = -89.0f;
+        if (Pitch > 89.9) {
+            Pitch = 89.9;
+        }
+        if (Pitch < -89.9) {
+            Pitch = -89.9;
         }
 
         updateCameraVectors();
     }
 
-    void ProcessMouseScroll(float yoffset)
-    {
+    void ProcessMouseScroll(float yoffset) {
         Zoom -= yoffset;
         if (Zoom < 1.0f)
             Zoom = 1.0f;
@@ -94,10 +93,7 @@ public:
     }
 
 
-    // calculates the front vector from the Camera's (updated) Euler Angles
-    void updateCameraVectors()
-    {
-        // calculate the new Front vector
+    void updateCameraVectors() {
         glm::vec3 front;
         front.x = cos(glm::radians(Yaw)) * cos(glm::radians(Pitch));
         front.y = sin(glm::radians(Pitch));

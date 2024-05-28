@@ -9,8 +9,8 @@ using namespace glm;
 
 const float PI = 3.14159265358979323846;
 
-int WIDTH = 800;
-int HEIGHT = 600;
+int WIDTH = 1920;
+int HEIGHT = 1080;
 float lastFrame = 0.0f;
 float deltaTime = 0.03f;	
 
@@ -28,7 +28,7 @@ struct alignas(16) RayPath {
 	glm::vec3 directions[PATH_STEPS];
 };
 
-Camera camera = Camera(vec3(0.0f, 0.0f, -7.0f), vec3(0.0f, 1.0f, 0.0f), vec3(0.0f, 0.0f, 1.0f));
+Camera camera = Camera(vec3(0.0f, 1.0f, -7.0f), vec3(0.0f, 1.0f, 0.0f), vec3(0.0f, 0.0f, 1.0f));
 
 //resize rendering window when window resized
 void framebuffer_size_callback(GLFWwindow* window, int width, int height) {
@@ -73,8 +73,14 @@ void processInput(GLFWwindow* window) {
 	if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
 		camera.ProcessKeyboard(RIGHT, deltaTime);
 	}
-	//display cursor when space pressed
 	if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) {
+		camera.ProcessKeyboard(UP, deltaTime);
+	}
+	if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) {
+		camera.ProcessKeyboard(DOWN, deltaTime);
+	}
+	//display cursor when space pressed
+	if (glfwGetKey(window, GLFW_KEY_R) == GLFW_PRESS) {
 		glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
 	}
 	else {
@@ -331,7 +337,7 @@ int main() {
 		glDispatchCompute(numRays, 1, 1);
 		glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 
-		//rendering code
+		//rendering
 
 		shader.use();
 
