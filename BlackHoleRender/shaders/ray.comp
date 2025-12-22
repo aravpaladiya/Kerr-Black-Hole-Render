@@ -20,7 +20,7 @@ struct RayPath {
 	vec3 dir[steps];
 };
 
-layout(local_size_x = 1) in;
+layout(local_size_x = 64) in;
 layout(std430, binding = 0) buffer RayPathBuffer {
 	RayPath rayPaths[];
 };
@@ -63,15 +63,10 @@ vec3 quatRotate(vec4 q, vec3 p) {
 }
 
 
-vec3 acceleration (float h2, vec3 pos) {
-	//this does not describe the real motion of the photon, but it does give an equivalent trajectory.
-	float r5 = pow(sqMag(pos), 2.5);
-	return -1.5*h2*pos/r5;
-	
-}
-
 vec3 acc(float h2, vec3 pos) {
-	float r5 = pow(sqMag(pos), 2.5);
+	//r^5 = (r^2)^2 * r = sqMag^2 * sqrt(sqMag)
+	float r2 = sqMag(pos);
+	float r5 = r2 * r2 * sqrt(r2);
 	return -1.5*h2*pos/r5;
 }
 
@@ -97,9 +92,10 @@ Ray rungekutta(float h2, Ray ray, float h) {
 
 void main() {
 	uint index = gl_GlobalInvocationID.x;
+	if (index >= TOTALCALLS) return; //bounds check for work group padding
 
 	vec3 planeNormal = normalize(cross(-camPos, camDir));
-	float angle = 2*PI*index/TOTALCALLS;
+	float angle = PI*index/TOTALCALLS;
 
 	Ray ray = Ray(camPos, quatRotate(quatFromAxis(angle, planeNormal), -normalize(camPos)));
 
@@ -113,7 +109,7 @@ void main() {
 	rayPaths[index].pos[0] = ray.pos;
 	rayPaths[index].dir[0] = ray.dir; 
 	float h2 = sqMag(cross(ray.pos, ray.dir));
-	float dt = float(40)/steps;//higher means less accurate, but further
+	float dt = float(100)/steps;//higher means less accurate, but further
 
 	for (int i = 1; i < steps; i++) {
 		prevRay = ray;
