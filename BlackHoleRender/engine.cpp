@@ -9,8 +9,8 @@ using namespace glm;
 
 const float PI = 3.14159265358979323846;
 
-int WIDTH = 1920;
-int HEIGHT = 1080;
+int WIDTH = 1000;
+int HEIGHT = 600;
 float lastFrame = 0.0f;
 float deltaTime = 0.03f;	
 
@@ -18,17 +18,14 @@ float deltaTime = 0.03f;
 float lastX = WIDTH / 2;
 float lastY = HEIGHT / 2;
 bool firstMouse = true;
+bool f11Held = false;
 #define PATH_STEPS 300
-struct RayPathPad {
 
-};
-struct alignas(16) RayPath {
+Camera camera = Camera(vec3(-0.0f, 1.4f, -6.0f), vec3(0.0f, 1.0f, 0.0f), glm::normalize(vec3(0.0f, 0.0f, 1.0f)));
 
-	glm::vec3 origins[PATH_STEPS];
-	glm::vec3 directions[PATH_STEPS];
-};
-
-Camera camera = Camera(vec3(0.0f, 1.0f, -7.0f), vec3(0.0f, 1.0f, 0.0f), vec3(0.0f, 0.0f, 1.0f));
+//skip compute dispatch when camera hasn't moved
+glm::vec3 prevCamPos = glm::vec3(std::numeric_limits<float>::max());
+glm::vec3 prevCamDir = glm::vec3(std::numeric_limits<float>::max());
 
 //resize rendering window when window resized
 void framebuffer_size_callback(GLFWwindow* window, int width, int height) {
@@ -78,6 +75,21 @@ void processInput(GLFWwindow* window) {
 	}
 	if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) {
 		camera.ProcessKeyboard(DOWN, deltaTime);
+	}
+	//toggle fullscreen on F11
+	if (glfwGetKey(window, GLFW_KEY_F11) == GLFW_PRESS && !f11Held) {
+		f11Held = true;
+		GLFWmonitor* monitor = glfwGetWindowMonitor(window);
+		if (monitor == nullptr) {
+			monitor = glfwGetPrimaryMonitor();
+			const GLFWvidmode* mode = glfwGetVideoMode(monitor);
+			glfwSetWindowMonitor(window, monitor, 0, 0, mode->width, mode->height, mode->refreshRate);
+		} else {
+			glfwSetWindowMonitor(window, nullptr, 100, 100, 1000, 600, 0);
+		}
+	}
+	if (glfwGetKey(window, GLFW_KEY_F11) == GLFW_RELEASE) {
+		f11Held = false;
 	}
 	//display cursor when space pressed
 	if (glfwGetKey(window, GLFW_KEY_R) == GLFW_PRESS) {
@@ -147,7 +159,7 @@ unsigned int loadTexture(char const * path) //returns ID for texture stored
     unsigned char *data = stbi_load(path, &width, &height, &nrComponents, 0);
     if (data)
     {
-        GLenum format;
+        GLenum format = GL_RGB;
         if (nrComponents == 1)
             format = GL_RED;
         else if (nrComponents == 3)
@@ -159,8 +171,8 @@ unsigned int loadTexture(char const * path) //returns ID for texture stored
         glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
         glGenerateMipmap(GL_TEXTURE_2D);
 
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
@@ -209,7 +221,7 @@ int main() {
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 	//init glfw
-	GLFWwindow* window = glfwCreateWindow(WIDTH, HEIGHT, "Learn", NULL, NULL);
+	GLFWwindow* window = glfwCreateWindow(WIDTH, HEIGHT, "Simulation", NULL, NULL);
 
 	if (window == NULL) {
 		std::cout << "Failed to create GLFW Window" << std::endl;
@@ -259,12 +271,13 @@ int main() {
 	glEnableVertexAttribArray(0);
 
 	//comp shader for rays
-	int numRays = 10*std::max(WIDTH, HEIGHT);
+	int numRays = 5*std::max(WIDTH, HEIGHT);
 	unsigned int raySSBO;
 	glGenBuffers(1, &raySSBO);
 	glBindBuffer(GL_SHADER_STORAGE_BUFFER, raySSBO);
-	//add 8 bytes per ray for padding
-	glBufferData(GL_SHADER_STORAGE_BUFFER, numRays * (sizeof(RayPath) + 8*PATH_STEPS), nullptr, GL_DYNAMIC_DRAW);
+	//each RayPath in std430 is 300 vec3 pos + 300 vec3 dir, 16 bytes each = 9600 bytes
+	size_t rayPathSize = PATH_STEPS * 2 * 16; //vec3 padded to 16 bytes in std430
+	glBufferData(GL_SHADER_STORAGE_BUFFER, numRays * rayPathSize, nullptr, GL_DYNAMIC_DRAW);
 
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, raySSBO);
 
@@ -274,16 +287,16 @@ int main() {
 	
 
 	
-	//textures for skybox
-	std::string skysubpath = "";
+	//textures for skybox (ESO Milky Way panorama by ESO/S. Brunier, CC BY 4.0)
+	std::string skysubpath = "res/eso_cubemap/";
 	std::vector<string> skyboxTextures
 	{
-		skysubpath + "right.png",
-		skysubpath + "left.png",
-		skysubpath + "top.png",
-		skysubpath + "bottom.png",
-		skysubpath + "front.png",
-		skysubpath + "back.png"
+		skysubpath + "right.png",   //+x
+		skysubpath + "left.png",    //-x
+		skysubpath + "top.png",     //+y
+		skysubpath + "bottom.png",  //-y
+		skysubpath + "front.png",   //+z
+		skysubpath + "back.png"     //-z
 	};
 	
 	texID = loadCubeMap(skyboxTextures);
@@ -296,6 +309,8 @@ int main() {
 
 	glEnable(GL_DEPTH_TEST);
 	
+	//textures
+	unsigned int colID = loadTexture("res/blackbody.png");
 
 	/**
 
@@ -320,22 +335,36 @@ int main() {
 		glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		
-		//precalculate ray paths along equatorial plane
-		glUseProgram(compProgram);
-		
-		glUniform1f(glGetUniformLocation(compProgram, "WIDTH"), static_cast<float>(WIDTH));
-		glUniform1f(glGetUniformLocation(compProgram, "HEIGHT"), static_cast<float>(HEIGHT));
-		glUniform3fv(glGetUniformLocation(compProgram, "camPos"), 1, value_ptr(camera.Position));
-		glUniform3fv(glGetUniformLocation(compProgram, "camDir"), 1, value_ptr(camera.Front));
-		glUniform3fv(glGetUniformLocation(compProgram, "camRight"), 1, value_ptr(camera.Right));
-		glUniform3fv(glGetUniformLocation(compProgram, "camUp"), 1, value_ptr(camera.Up));
+		//update ray count if window resized
+		int newNumRays = 5 * std::max(WIDTH, HEIGHT);
+		if (newNumRays != numRays) {
+			numRays = newNumRays;
+			glBindBuffer(GL_SHADER_STORAGE_BUFFER, raySSBO);
+			glBufferData(GL_SHADER_STORAGE_BUFFER, numRays * rayPathSize, nullptr, GL_DYNAMIC_DRAW);
+			prevCamPos = glm::vec3(std::numeric_limits<float>::max()); //force recompute
+		}
 
-		glUniform1i(glGetUniformLocation(compProgram, "STEPS"), PATH_STEPS); 
-		glUniform1i(glGetUniformLocation(compProgram, "TOTALCALLS"), numRays);
-		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, raySSBO);
+		//precalculate ray paths along equatorial plane (only if camera moved)
+		bool cameraChanged = (camera.Position != prevCamPos || camera.Front != prevCamDir);
+		if (cameraChanged) {
+			glUseProgram(compProgram);
 
-		glDispatchCompute(numRays, 1, 1);
-		glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+			glUniform1f(glGetUniformLocation(compProgram, "WIDTH"), static_cast<float>(WIDTH));
+			glUniform1f(glGetUniformLocation(compProgram, "HEIGHT"), static_cast<float>(HEIGHT));
+			glUniform3fv(glGetUniformLocation(compProgram, "camPos"), 1, value_ptr(camera.Position));
+			glUniform3fv(glGetUniformLocation(compProgram, "camDir"), 1, value_ptr(camera.Front));
+			glUniform3fv(glGetUniformLocation(compProgram, "camRight"), 1, value_ptr(camera.Right));
+			glUniform3fv(glGetUniformLocation(compProgram, "camUp"), 1, value_ptr(camera.Up));
+
+			glUniform1i(glGetUniformLocation(compProgram, "TOTALCALLS"), numRays);
+			glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, raySSBO);
+
+			glDispatchCompute((numRays + 63) / 64, 1, 1);
+			glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+
+			prevCamPos = camera.Position;
+			prevCamDir = camera.Front;
+		}
 
 		//rendering
 
@@ -344,9 +373,12 @@ int main() {
 		glBindVertexArray(VAO);
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_CUBE_MAP, texID);
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_2D, colID);
+		float time = glfwGetTime();
+
 		if (false) {//view moves around black hole
 			float r = length(camera.Position);
-			float time = glfwGetTime();
 			float speed = 0.1;
 			float timeS = sin(speed * time);
 			float timeC = cos(speed * time);
@@ -372,6 +404,10 @@ int main() {
 		shader.setF("WIDTH", static_cast<float>(WIDTH));
 		shader.setF("HEIGHT", static_cast<float>(HEIGHT));
 		shader.setI("TOTALCALLS", numRays);
+		shader.setI("colormap", 1);
+		shader.setF("tempconst", 35000.0f);
+		shader.setF("brightconst", 1.4f);
+		shader.setF("time", time);
 
 		glDrawArrays(GL_TRIANGLES, 0, 6);
 
