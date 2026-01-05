@@ -1,0 +1,465 @@
+#version 460 core
+//pass 2, one thread per pixel. reads coarse grid, checks error bound,
+//interpolates or falls back to per pixel integration
+layout(local_size_x = 16, local_size_y = 16) in;
+
+uniform float spin_a;
+uniform float r_obs, theta_obs, phi_obs;
+uniform float fov;
+uniform int WIDTH, HEIGHT;
+uniform vec3 camDir, camRight, camUp;
+uniform int debugTileLevel;
+uniform int forcePerPixel;
+uniform int COARSE_W, COARSE_H;
+uniform float diskIn, diskOut;  //visible disk range
+
+#define COARSE_K 8
+#define PI 3.14159265359
+#define MAX_STEPS 5000
+#define STEP_SIZE 0.01
+#define R_ESCAPE 150.0
+#define R_HORIZON_EPS 0.001
+
+struct PixelResult {
+	vec4 skyDir_hitType;
+	vec4 crossing0;
+	vec4 crossing1;
+	vec4 crossing2;
+};
+
+layout(std430, binding = 0) buffer PixelBuffer {
+	PixelResult pixels[];
+};
+
+struct CoarsePoint {
+	vec4 sky_hit;  //.x = sky_th, .y = sky_ph, .z = hitType, .w = numVisibleCrossings
+	vec4 disk0;    //first visible crossing: r, phi, g, 0
+	vec4 disk1;    //second
+	vec4 disk2;    //third
+};
+
+layout(std430, binding = 1) buffer CoarseBuffer {
+	CoarsePoint coarse[];
+};
+
+//kerr geodesic equations
+float R_accel(float r, float a2, float P_coeff, float C_coeff) {
+	float P = r * r + a2 - P_coeff;
+	return 2.0 * r * P - (r - 1.0) * C_coeff;
+}
+float R_potential(float r, float a2, float P_coeff, float C_coeff) {
+	float P = r * r + a2 - P_coeff;
+	float Delta = r * r - 2.0 * r + a2;
+	return P * P - Delta * C_coeff;
+}
+float Theta_accel_sc(float sth, float cth, float a2, float lam2) {
+	float s2 = sth * sth, s3 = s2 * sth;
+	if (s3 < 1e-8) return 0.0;
+	return cth * (lam2 - a2 * s2 * s2) / s3;
+}
+float Theta_potential_sc(float sth, float cth, float a2, float lam2, float q2) {
+	float s2 = sth * sth;
+	return q2 + cth * cth * (a2 - lam2 / s2);
+}
+float Phi_velocity_sc(float r, float sth, float a, float a2, float lam, float P_coeff) {
+	float s2 = sth * sth;
+	float Delta = r * r - 2.0 * r + a2;
+	if (abs(Delta) < 1e-6) Delta = 1e-6;
+	float P = r * r + a2 - P_coeff;
+	return lam / s2 + a * P / Delta - a;
+}
+void screenToImpact(float sx, float sy, float a, float a2,
+                    out float lam_out, out float q2_out, out float vr_out, out float vth_out) {
+	vec3 localDir = normalize(camDir + sx * camRight + sy * camUp);
+	float r = r_obs, r2 = r * r;
+	float th = theta_obs, ph = phi_obs;
+	float sth_o=sin(th),cth_o=cos(th),sph=sin(ph),cph=cos(ph);
+	float rho=sqrt(r2+a2);
+	vec3 er=normalize(vec3(r*sth_o*cph/rho,cth_o,r*sth_o*sph/rho));
+	vec3 eth=normalize(vec3(rho*cth_o*cph,-r*sth_o,rho*cth_o*sph));
+	vec3 eph=vec3(-sph,0.0,cph);
+	float n1=dot(localDir,er),n2=dot(localDir,eth),n3=dot(localDir,eph);
+	float Sigma=r2+a2*cth_o*cth_o,Delta=r2-2.0*r+a2;
+	float A_met=(r2+a2)*(r2+a2)-a2*Delta*sth_o*sth_o;
+	float alpha_l=sqrt(Delta*Sigma/A_met),omega_f=2.0*a*r/A_met;
+	float kt=1.0/alpha_l,kr=n1*sqrt(Delta/Sigma),kth=n2/sqrt(Sigma);
+	float kph=omega_f/alpha_l+n3*sqrt(Sigma)/(sth_o*sqrt(A_met));
+	float g_tt=-(1.0-2.0*r/Sigma),g_tph=-2.0*a*r*sth_o*sth_o/Sigma;
+	float g_phph=sth_o*sth_o*A_met/Sigma;
+	float E=-(g_tt*kt+g_tph*kph),Lz=g_tph*kt+g_phph*kph;
+	lam_out=Lz/E;
+	float lam2=lam_out*lam_out,pth=Sigma*kth;
+	q2_out=(pth*pth)/(E*E)+cth_o*cth_o*(lam2/(sth_o*sth_o)-a2);
+	float P_c=a*lam_out,C_c=(lam_out-a)*(lam_out-a)+q2_out;
+	vr_out=(n1<0.0?-1.0:1.0)*sqrt(max(R_potential(r,a2,P_c,C_c),0.0));
+	vth_out=(n2<0.0?-1.0:1.0)*sqrt(max(Theta_potential_sc(sth_o,cth_o,a2,lam2,q2_out),0.0));
+}
+//rhs using mu = cos(theta), no pole singularity
+void rhs_mu(float r, float vr, float mu, float vmu, float a, float a2,
+            float lam, float lam2, float q2, float P_coeff, float C_coeff,
+            out float dr, out float dvr, out float dmu, out float dvmu, out float dph) {
+	dr = vr;
+	dvr = R_accel(r, a2, P_coeff, C_coeff);
+	dmu = vmu;
+	//d^2(mu)/dsigma^2 = -mu*(q^2 + lambda^2 + a^2*(2mu^2 - 1)), regular at poles
+	dvmu = -mu * (q2 + lam2 + a2 * (2.0 * mu * mu - 1.0));
+	//phi equation still uses sin^2(theta) = 1 - mu^2
+	float sth = sqrt(max(1.0 - mu * mu, 1e-20));
+	dph = Phi_velocity_sc(r, max(sth, 1e-7), a, a2, lam, P_coeff);
+}
+
+//single ray integration with mu = cos(theta)
+void integrateSingleRay(float sx, float sy, float a, float a2, out PixelResult px) {
+	float lam,q2,vr0,vth0;
+	screenToImpact(sx,sy,a,a2,lam,q2,vr0,vth0);
+	float lam2=lam*lam,P_coeff=a*lam,C_coeff=(lam-a)*(lam-a)+q2;
+	float sth_o=sin(theta_obs);
+	float cur_r=r_obs,cur_vr=vr0;
+	float cur_mu=cos(theta_obs),cur_vmu=-sth_o*vth0; //mu=cos(th), vmu=-sin(th)*vth
+	float cur_ph=phi_obs;
+	float r_horizon=1.0+sqrt(1.0-a2);
+	bool hitHorizon=false;
+	int numCrossings=0;
+	float crossR[3],crossPhi[3],crossG[3];
+	for(int step=0;step<MAX_STEPS;step++){
+		//first rhs used both for the adaptive step size and as k1
+		float dr1,dvr1,dmu1,dvmu1,dph1;
+		rhs_mu(cur_r,cur_vr,cur_mu,cur_vmu,a,a2,lam,lam2,q2,P_coeff,C_coeff,dr1,dvr1,dmu1,dvmu1,dph1);
+		float ds = min(STEP_SIZE, 1.0 / (cur_r * cur_r));
+		float prev_r=cur_r,prev_mu=cur_mu,prev_ph=cur_ph;
+		float dr2,dvr2,dmu2,dvmu2,dph2;
+		float dr3,dvr3,dmu3,dvmu3,dph3,dr4,dvr4,dmu4,dvmu4,dph4;
+		rhs_mu(cur_r+.5*ds*dr1,cur_vr+.5*ds*dvr1,cur_mu+.5*ds*dmu1,cur_vmu+.5*ds*dvmu1,a,a2,lam,lam2,q2,P_coeff,C_coeff,dr2,dvr2,dmu2,dvmu2,dph2);
+		rhs_mu(cur_r+.5*ds*dr2,cur_vr+.5*ds*dvr2,cur_mu+.5*ds*dmu2,cur_vmu+.5*ds*dvmu2,a,a2,lam,lam2,q2,P_coeff,C_coeff,dr3,dvr3,dmu3,dvmu3,dph3);
+		rhs_mu(cur_r+ds*dr3,cur_vr+ds*dvr3,cur_mu+ds*dmu3,cur_vmu+ds*dvmu3,a,a2,lam,lam2,q2,P_coeff,C_coeff,dr4,dvr4,dmu4,dvmu4,dph4);
+		float s6=ds/6.0;
+		cur_r+=s6*(dr1+2.0*dr2+2.0*dr3+dr4);
+		cur_vr+=s6*(dvr1+2.0*dvr2+2.0*dvr3+dvr4);
+		cur_mu+=s6*(dmu1+2.0*dmu2+2.0*dmu3+dmu4);
+		cur_vmu+=s6*(dvmu1+2.0*dvmu2+2.0*dvmu3+dvmu4);
+		cur_ph+=s6*(dph1+2.0*dph2+2.0*dph3+dph4);
+		//reflect mu back if it overshoots past +/-1
+		if(cur_mu>1.0){cur_mu=2.0-cur_mu;cur_vmu=-cur_vmu;cur_ph+=PI;}
+		if(cur_mu<-1.0){cur_mu=-2.0-cur_mu;cur_vmu=-cur_vmu;cur_ph+=PI;}
+		//record crossings before the horizon/escape break so a step that both
+		//crosses the disk and plunges past the horizon keeps its final crossing
+		if(numCrossings<3){
+			if(prev_mu*cur_mu<0.0){
+				float frac=prev_mu/(prev_mu-cur_mu);
+				float cr=mix(prev_r,cur_r,frac);
+				//only record crossings in the visible disk range, so crossings inside
+				//the isco (common at high spin) can't fill all three slots
+				if(cr>=diskIn&&cr<=diskOut){
+					float cp=prev_ph+frac*(cur_ph-prev_ph);
+					cp=mod(cp,2.0*PI);
+					float r15=cr*sqrt(cr),Omega_K=1.0/(r15+a);
+					float denom=cr*cr*cr-3.0*cr*cr+2.0*a*r15;
+					float gF=0.0;
+					//g = 1/(u^t (1 + Omega*lam)), lam is backward traced so its sign
+					//is flipped relative to the photon's L_z/E
+					if(denom>0.0){float ut=(r15+a)/sqrt(denom);gF=1.0/(ut*(1.0+Omega_K*lam));}
+					crossR[numCrossings]=cr;crossPhi[numCrossings]=cp;crossG[numCrossings]=gF;
+					numCrossings++;
+				}
+			}
+		}
+		if(cur_r<r_horizon+R_HORIZON_EPS){hitHorizon=true;break;}
+		if(cur_r>R_ESCAPE&&cur_vr>0.0)break;
+		//mod phi to prevent float overflow from winding near poles
+		cur_ph=mod(cur_ph,2.0*PI);
+	}
+	if(hitHorizon||cur_r<r_horizon+0.1)px.skyDir_hitType=vec4(0,0,0,2);
+	else{
+		float esc_sth=sqrt(max(1.0-cur_mu*cur_mu,0.0));
+		float esc_cth=cur_mu;
+		float esc_sph=sin(cur_ph),esc_cph=cos(cur_ph);
+		float esc_rho=sqrt(cur_r*cur_r+a2);
+		float vx,vy,vz;
+		//vy = vr*cos(th) + vmu*r, always well conditioned
+		vy=cur_vr*esc_cth+cur_vmu*cur_r;
+		if(esc_sth>1e-7){
+			//bl to cartesian velocity. Theta>=0 bounds |lambda/sin(theta)| <= sqrt(q2+a2)
+			//so the 1/sin(theta) terms stay finite even for tiny sin(theta)
+			float esc_vth=-cur_vmu/esc_sth;
+			float dphi_esc=Phi_velocity_sc(cur_r,esc_sth,a,a2,lam,P_coeff);
+			vx=cur_vr*(cur_r*esc_sth*esc_cph/esc_rho)+esc_vth*(esc_rho*esc_cth*esc_cph)+dphi_esc*(-esc_rho*esc_sth*esc_sph);
+			vz=cur_vr*(cur_r*esc_sth*esc_sph/esc_rho)+esc_vth*(esc_rho*esc_cth*esc_sph)+dphi_esc*(esc_rho*esc_sth*esc_cph);
+		} else {
+			//at pole, purely radial escape
+			vx=0.0; vz=0.0;
+		}
+		px.skyDir_hitType=vec4(normalize(vec3(vx,vy,vz)),0);
+	}
+	px.crossing0=px.crossing1=px.crossing2=vec4(0);
+	if(numCrossings>0)px.crossing0=vec4(crossR[0],crossPhi[0],crossG[0],float(numCrossings));
+	if(numCrossings>1)px.crossing1=vec4(crossR[1],crossPhi[1],crossG[1],0);
+	if(numCrossings>2)px.crossing2=vec4(crossR[2],crossPhi[2],crossG[2],0);
+}
+
+//per pixel
+void integratePixel(float sx, float sy, float a, float a2, out PixelResult px) {
+	integrateSingleRay(sx, sy, a, a2, px);
+}
+
+float wrapDelta(float a, float b) {
+	float d = b - a;
+	if (d > PI) d -= 2.0*PI;
+	if (d < -PI) d += 2.0*PI;
+	return d;
+}
+
+void main() {
+	uint gx = gl_GlobalInvocationID.x;
+	uint gy = gl_GlobalInvocationID.y;
+	if (gx >= WIDTH || gy >= HEIGHT) return;
+	uint idx = gy * uint(WIDTH) + gx;
+
+	float a = spin_a;
+	float a2 = a * a;
+	float aspect = float(WIDTH) / float(HEIGHT);
+	float tanHalf = tan(radians(fov)*0.5);
+	float my_sx = (2.0*(float(gx)+0.5)/float(WIDTH)-1.0)*aspect*tanHalf;
+	float my_sy = (2.0*(float(gy)+0.5)/float(HEIGHT)-1.0)*tanHalf;
+
+	//force per pixel mode
+	if (forcePerPixel == 1) {
+		PixelResult px;
+		integratePixel(my_sx, my_sy, a, a2, px);
+		pixels[idx] = px;
+		return;
+	}
+
+	//coarse grid cell for this pixel
+	uint ci = gx / COARSE_K;
+	uint cj = gy / COARSE_K;
+
+	//bounds check, need ci+1 and cj+1
+	if (ci + 1 >= COARSE_W || cj + 1 >= COARSE_H) {
+		PixelResult px;
+		integratePixel(my_sx, my_sy, a, a2, px);
+		pixels[idx] = px;
+		return;
+	}
+
+	//read 4 corners of the coarse cell
+	CoarsePoint c00 = coarse[cj * uint(COARSE_W) + ci];
+	CoarsePoint c10 = coarse[cj * uint(COARSE_W) + ci + 1u];
+	CoarsePoint c01 = coarse[(cj+1u) * uint(COARSE_W) + ci];
+	CoarsePoint c11 = coarse[(cj+1u) * uint(COARSE_W) + ci + 1u];
+
+	//photon sphere straddling check
+	//thin lensed features (secondary disk images, photon ring) can slip between
+	//coarse samples. if the cell straddles a steep gradient in closest approach
+	//radius (disk0.w = min_r from kerr_tile.comp) integrate per pixel
+	bool anyHorizon = c00.sky_hit.z > 1.0 || c10.sky_hit.z > 1.0 ||
+	                  c01.sky_hit.z > 1.0 || c11.sky_hit.z > 1.0;
+	if (!anyHorizon) {
+		float minr = min(min(c00.disk0.w, c10.disk0.w), min(c01.disk0.w, c11.disk0.w));
+		float maxr = max(max(c00.disk0.w, c10.disk0.w), max(c01.disk0.w, c11.disk0.w));
+		//large disagreement in min_r across the cell = photon sphere edge
+		if (maxr - minr > 1.0) {
+			PixelResult px;
+			integratePixel(my_sx, my_sy, a, a2, px);
+			if (debugTileLevel == 1) px.skyDir_hitType.w = 13.0;
+			pixels[idx] = px;
+			return;
+		}
+	}
+
+	//type check
+	//all corners must have the same type (sky vs horizon)
+	bool allSky = c00.sky_hit.z < 1.0 && c10.sky_hit.z < 1.0 &&
+	              c01.sky_hit.z < 1.0 && c11.sky_hit.z < 1.0;
+	bool allHorizon = c00.sky_hit.z > 1.0 && c10.sky_hit.z > 1.0 &&
+	                  c01.sky_hit.z > 1.0 && c11.sky_hit.z > 1.0;
+
+	if (!allSky && !allHorizon) {
+		//mixed type = shadow boundary, integrate per pixel
+		PixelResult px;
+		integratePixel(my_sx, my_sy, a, a2, px);
+		if (debugTileLevel == 1) px.skyDir_hitType.w = 13.0;
+		pixels[idx] = px;
+		return;
+	}
+
+	if (allHorizon) {
+		int hMinCross = int(min(min(c00.sky_hit.w, c10.sky_hit.w), min(c01.sky_hit.w, c11.sky_hit.w)));
+		int hMaxCross = int(max(max(c00.sky_hit.w, c10.sky_hit.w), max(c01.sky_hit.w, c11.sky_hit.w)));
+
+		PixelResult px;
+		px.skyDir_hitType = vec4(0, 0, 0, 2);
+		px.crossing0 = px.crossing1 = px.crossing2 = vec4(0);
+
+		if (hMinCross != hMaxCross) {
+			//mixed crossing counts, per pixel for disk
+			PixelResult ppx;
+			integratePixel(my_sx, my_sy, a, a2, ppx);
+			px.crossing0 = ppx.crossing0;
+			px.crossing1 = ppx.crossing1;
+			px.crossing2 = ppx.crossing2;
+		} else if (hMinCross >= 1) {
+			float tx = float(gx % COARSE_K) / float(COARSE_K);
+			float ty = float(gy % COARSE_K) / float(COARSE_K);
+			vec4 d0[4] = vec4[4](c00.disk0, c10.disk0, c01.disk0, c11.disk0);
+			float r_c=mix(mix(d0[0].x,d0[1].x,tx),mix(d0[2].x,d0[3].x,tx),ty);
+			float p0=d0[0].y; float p1=p0+wrapDelta(p0,d0[1].y); float p2=p0+wrapDelta(p0,d0[2].y); float p3=p0+wrapDelta(p0,d0[3].y);
+			float phi_c=mix(mix(p0,p1,tx),mix(p2,p3,tx),ty);
+			float g_c=mix(mix(d0[0].z,d0[1].z,tx),mix(d0[2].z,d0[3].z,tx),ty);
+			px.crossing0 = vec4(r_c,phi_c,g_c,float(hMinCross));
+
+			if (hMinCross >= 2) {
+				vec4 d1[4] = vec4[4](c00.disk1, c10.disk1, c01.disk1, c11.disk1);
+				r_c=mix(mix(d1[0].x,d1[1].x,tx),mix(d1[2].x,d1[3].x,tx),ty);
+				p0=d1[0].y; p1=p0+wrapDelta(p0,d1[1].y); p2=p0+wrapDelta(p0,d1[2].y); p3=p0+wrapDelta(p0,d1[3].y);
+				phi_c=mix(mix(p0,p1,tx),mix(p2,p3,tx),ty);
+				g_c=mix(mix(d1[0].z,d1[1].z,tx),mix(d1[2].z,d1[3].z,tx),ty);
+				px.crossing1 = vec4(r_c,phi_c,g_c,0);
+			}
+		}
+
+		if (debugTileLevel == 1) px.skyDir_hitType.w = 10.0;
+		pixels[idx] = px;
+		return;
+	}
+
+	//bilinear interpolation error bound
+	//bilinear interpolation error on a cell: |err| <= (h^2/8)|f_xx| + (k^2/8)|f_yy|
+	//(f_xy doesn't appear, bilinear is exact for f=xy). the pure second derivatives
+	//need samples outside the 2x2 cell, so estimate from coarse grid neighbors:
+	//f(i-1,j) - 2f(i,j) + f(i+1,j) already carries the h^2 factor, so dividing by 8
+	//gives the error in angular units, compared against one pixel (alpha)
+	float alpha = tanHalf * 2.0 / float(max(WIDTH, HEIGHT));
+
+	//corner twist check as a cheap early out for severe non-bilinearity
+	float D_th = abs(c00.sky_hit.x + c11.sky_hit.x - c10.sky_hit.x - c01.sky_hit.x);
+	float D_ph = abs(wrapDelta(c00.sky_hit.y, c11.sky_hit.y)
+	           - wrapDelta(c00.sky_hit.y, c10.sky_hit.y)
+	           - wrapDelta(c00.sky_hit.y, c01.sky_hit.y));
+	if (D_th / 4.0 > alpha || D_ph / 4.0 > alpha) {
+		PixelResult px;
+		integratePixel(my_sx, my_sy, a, a2, px);
+		if (debugTileLevel == 1) px.skyDir_hitType.w = 13.0;
+		pixels[idx] = px;
+		return;
+	}
+
+	//neighbor second differences catch pure radial curvature like the einstein ring.
+	//needs interior neighbors on all sides
+	if (ci >= 1u && ci + 2u < uint(COARSE_W) && cj >= 1u && cj + 2u < uint(COARSE_H)) {
+		CoarsePoint cxm_0 = coarse[cj        * uint(COARSE_W) + (ci - 1u)];
+		CoarsePoint cxm_1 = coarse[(cj + 1u) * uint(COARSE_W) + (ci - 1u)];
+		CoarsePoint cxp_0 = coarse[cj        * uint(COARSE_W) + (ci + 2u)];
+		CoarsePoint cxp_1 = coarse[(cj + 1u) * uint(COARSE_W) + (ci + 2u)];
+		CoarsePoint cym_0 = coarse[(cj - 1u) * uint(COARSE_W) + ci];
+		CoarsePoint cym_1 = coarse[(cj - 1u) * uint(COARSE_W) + (ci + 1u)];
+		CoarsePoint cyp_0 = coarse[(cj + 2u) * uint(COARSE_W) + ci];
+		CoarsePoint cyp_1 = coarse[(cj + 2u) * uint(COARSE_W) + (ci + 1u)];
+
+		//only if all neighbors are sky hits, otherwise a separatrix is nearby
+		//and their values aren't comparable
+		bool neighSky = (cxm_0.sky_hit.z < 1.0) && (cxm_1.sky_hit.z < 1.0) &&
+		                (cxp_0.sky_hit.z < 1.0) && (cxp_1.sky_hit.z < 1.0) &&
+		                (cym_0.sky_hit.z < 1.0) && (cym_1.sky_hit.z < 1.0) &&
+		                (cyp_0.sky_hit.z < 1.0) && (cyp_1.sky_hit.z < 1.0);
+
+		if (neighSky) {
+			//second differences for sky_th
+			float Dxx_th = max(max(
+				abs(cxm_0.sky_hit.x - 2.0*c00.sky_hit.x + c10.sky_hit.x),
+				abs(c00.sky_hit.x   - 2.0*c10.sky_hit.x + cxp_0.sky_hit.x)),
+				max(
+				abs(cxm_1.sky_hit.x - 2.0*c01.sky_hit.x + c11.sky_hit.x),
+				abs(c01.sky_hit.x   - 2.0*c11.sky_hit.x + cxp_1.sky_hit.x)));
+			float Dyy_th = max(max(
+				abs(cym_0.sky_hit.x - 2.0*c00.sky_hit.x + c01.sky_hit.x),
+				abs(cym_1.sky_hit.x - 2.0*c10.sky_hit.x + c11.sky_hit.x)),
+				max(
+				abs(c00.sky_hit.x   - 2.0*c01.sky_hit.x + cyp_0.sky_hit.x),
+				abs(c10.sky_hit.x   - 2.0*c11.sky_hit.x + cyp_1.sky_hit.x)));
+
+			//second differences for sky_ph using wrapDelta signed increments,
+			//f(i-1) - 2f(i) + f(i+1) = wrapDelta(f(i), f(i+1)) + wrapDelta(f(i), f(i-1))
+			float Dxx_ph = max(max(
+				abs(wrapDelta(c00.sky_hit.y, cxm_0.sky_hit.y) + wrapDelta(c00.sky_hit.y, c10.sky_hit.y)),
+				abs(wrapDelta(c10.sky_hit.y, c00.sky_hit.y)   + wrapDelta(c10.sky_hit.y, cxp_0.sky_hit.y))),
+				max(
+				abs(wrapDelta(c01.sky_hit.y, cxm_1.sky_hit.y) + wrapDelta(c01.sky_hit.y, c11.sky_hit.y)),
+				abs(wrapDelta(c11.sky_hit.y, c01.sky_hit.y)   + wrapDelta(c11.sky_hit.y, cxp_1.sky_hit.y))));
+			float Dyy_ph = max(max(
+				abs(wrapDelta(c00.sky_hit.y, cym_0.sky_hit.y) + wrapDelta(c00.sky_hit.y, c01.sky_hit.y)),
+				abs(wrapDelta(c10.sky_hit.y, cym_1.sky_hit.y) + wrapDelta(c10.sky_hit.y, c11.sky_hit.y))),
+				max(
+				abs(wrapDelta(c01.sky_hit.y, c00.sky_hit.y)   + wrapDelta(c01.sky_hit.y, cyp_0.sky_hit.y)),
+				abs(wrapDelta(c11.sky_hit.y, c10.sky_hit.y)   + wrapDelta(c11.sky_hit.y, cyp_1.sky_hit.y))));
+
+			//Dxx/Dyy already carry h^2 so the bound is Dxx/8 + Dyy/8
+			if ((Dxx_th + Dyy_th) / 8.0 > alpha || (Dxx_ph + Dyy_ph) / 8.0 > alpha) {
+				PixelResult px;
+				integratePixel(my_sx, my_sy, a, a2, px);
+				if (debugTileLevel == 1) px.skyDir_hitType.w = 13.0;
+				pixels[idx] = px;
+				return;
+			}
+		}
+	}
+
+	//bilinear interpolation
+	float tx = float(gx % COARSE_K) / float(COARSE_K);
+	float ty = float(gy % COARSE_K) / float(COARSE_K);
+
+	//interpolate sky direction
+	float th00 = c00.sky_hit.x, th10 = c10.sky_hit.x;
+	float th01 = c01.sky_hit.x, th11 = c11.sky_hit.x;
+	float sky_th = mix(mix(th00, th10, tx), mix(th01, th11, tx), ty);
+
+	//phi needs wrap safe interpolation
+	float ph00 = c00.sky_hit.y;
+	float ph10 = ph00 + wrapDelta(ph00, c10.sky_hit.y);
+	float ph01 = ph00 + wrapDelta(ph00, c01.sky_hit.y);
+	float ph11 = ph00 + wrapDelta(ph00, c11.sky_hit.y);
+	float sky_ph = mix(mix(ph00, ph10, tx), mix(ph01, ph11, tx), ty);
+
+	//convert to cartesian sky direction
+	float sth = sin(sky_th);
+	vec3 skyDir = vec3(sth * cos(sky_ph), cos(sky_th), sth * sin(sky_ph));
+
+	PixelResult px;
+	px.skyDir_hitType = vec4(skyDir, 0);
+
+	//if crossing counts disagree between corners fall back to per pixel
+	px.crossing0 = px.crossing1 = px.crossing2 = vec4(0);
+	int minCross = int(min(min(c00.sky_hit.w, c10.sky_hit.w), min(c01.sky_hit.w, c11.sky_hit.w)));
+	int maxCross = int(max(max(c00.sky_hit.w, c10.sky_hit.w), max(c01.sky_hit.w, c11.sky_hit.w)));
+	if (minCross != maxCross) {
+		PixelResult ppx;
+		integratePixel(my_sx, my_sy, a, a2, ppx);
+		//keep interpolated sky, use per pixel disk crossings
+		px.crossing0 = ppx.crossing0;
+		px.crossing1 = ppx.crossing1;
+		px.crossing2 = ppx.crossing2;
+		if (debugTileLevel == 1) px.skyDir_hitType.w = 10.0;
+		pixels[idx] = px;
+		return;
+	}
+
+	vec4 disks0[4] = vec4[4](c00.disk0, c10.disk0, c01.disk0, c11.disk0);
+	vec4 disks1[4] = vec4[4](c00.disk1, c10.disk1, c01.disk1, c11.disk1);
+
+	if (minCross >= 1) {
+		float r_c = mix(mix(disks0[0].x,disks0[1].x,tx),mix(disks0[2].x,disks0[3].x,tx),ty);
+		float p0=disks0[0].y; float p1=p0+wrapDelta(p0,disks0[1].y); float p2=p0+wrapDelta(p0,disks0[2].y); float p3=p0+wrapDelta(p0,disks0[3].y);
+		float phi_c=mix(mix(p0,p1,tx),mix(p2,p3,tx),ty);
+		float g_c=mix(mix(disks0[0].z,disks0[1].z,tx),mix(disks0[2].z,disks0[3].z,tx),ty);
+		px.crossing0 = vec4(r_c, phi_c, g_c, float(minCross));
+	}
+	if (minCross >= 2) {
+		float r_c = mix(mix(disks1[0].x,disks1[1].x,tx),mix(disks1[2].x,disks1[3].x,tx),ty);
+		float p0=disks1[0].y; float p1=p0+wrapDelta(p0,disks1[1].y); float p2=p0+wrapDelta(p0,disks1[2].y); float p3=p0+wrapDelta(p0,disks1[3].y);
+		float phi_c=mix(mix(p0,p1,tx),mix(p2,p3,tx),ty);
+		float g_c=mix(mix(disks1[0].z,disks1[1].z,tx),mix(disks1[2].z,disks1[3].z,tx),ty);
+		px.crossing1 = vec4(r_c, phi_c, g_c, 0);
+	}
+
+	if (debugTileLevel == 1) px.skyDir_hitType.w = 10.0;
+	pixels[idx] = px;
+}
