@@ -1,0 +1,232 @@
+#version 460 core
+//pass 1, coarse grid integration, one thread per coarse grid point
+//integrates every COARSE_K-th pixel, stores results for interpolation
+layout(local_size_x = 256) in;
+
+uniform float spin_a;
+uniform float r_obs, theta_obs, phi_obs;
+uniform float fov;
+uniform int WIDTH, HEIGHT;
+uniform vec3 camDir, camRight, camUp;
+uniform int COARSE_W, COARSE_H; //coarse grid dimensions
+uniform float diskIn, diskOut;  //visible disk range
+
+#define COARSE_K 8 //sample every 8th pixel
+
+//coarse grid point result
+struct CoarsePoint {
+	vec4 sky_hit;  //.x = sky_th, .y = sky_ph, .z = hitType (0=sky,2=horizon), .w = numVisibleCrossings
+	vec4 disk0;    //first visible crossing: .x=r, .y=phi, .z=gFactor, .w=0
+	vec4 disk1;    //second visible crossing
+	vec4 disk2;    //third visible crossing
+};
+
+layout(std430, binding = 1) buffer CoarseBuffer {
+	CoarsePoint coarse[];
+};
+
+#define PI 3.14159265359
+#define MAX_STEPS 5000
+#define STEP_SIZE 0.01
+#define R_ESCAPE 150.0
+#define R_HORIZON_EPS 0.001
+
+//kerr geodesic equations, identical to kerr.comp
+
+float R_accel(float r, float a2, float P_coeff, float C_coeff) {
+	float P = r * r + a2 - P_coeff;
+	return 2.0 * r * P - (r - 1.0) * C_coeff;
+}
+
+float R_potential(float r, float a2, float P_coeff, float C_coeff) {
+	float P = r * r + a2 - P_coeff;
+	float Delta = r * r - 2.0 * r + a2;
+	return P * P - Delta * C_coeff;
+}
+
+float Theta_accel_sc(float sth, float cth, float a2, float lam2) {
+	float s2 = sth * sth;
+	float s3 = s2 * sth;
+	if (s3 < 1e-8) return 0.0;
+	return cth * (lam2 - a2 * s2 * s2) / s3;
+}
+
+float Theta_potential_sc(float sth, float cth, float a2, float lam2, float q2) {
+	float s2 = sth * sth;
+	return q2 + cth * cth * (a2 - lam2 / s2);
+}
+
+float Phi_velocity_sc(float r, float sth, float a, float a2, float lam, float P_coeff) {
+	float s2 = sth * sth;
+	float Delta = r * r - 2.0 * r + a2;
+	if (abs(Delta) < 1e-6) Delta = 1e-6;
+	float P = r * r + a2 - P_coeff;
+	return lam / s2 + a * P / Delta - a;
+}
+
+//rhs using mu = cos(theta), no pole singularity
+void rhs_mu(float r, float vr, float mu, float vmu, float a, float a2,
+            float lam, float lam2, float q2, float P_coeff, float C_coeff,
+            out float dr, out float dvr, out float dmu, out float dvmu, out float dph) {
+	dr = vr;
+	dvr = R_accel(r, a2, P_coeff, C_coeff);
+	dmu = vmu;
+	dvmu = -mu * (q2 + lam2 + a2 * (2.0 * mu * mu - 1.0));
+	float sth = sqrt(max(1.0 - mu * mu, 1e-20));
+	dph = Phi_velocity_sc(r, max(sth, 1e-7), a, a2, lam, P_coeff);
+}
+
+void screenToImpact(float sx, float sy, float a, float a2,
+                    out float lam_out, out float q2_out, out float vr_out, out float vth_out) {
+	vec3 localDir = normalize(camDir + sx * camRight + sy * camUp);
+	float r = r_obs, r2 = r * r;
+	float th = theta_obs, ph = phi_obs;
+	float sth_o = sin(th), cth_o = cos(th), sph = sin(ph), cph = cos(ph);
+	float rho = sqrt(r2 + a2);
+
+	vec3 er  = normalize(vec3(r*sth_o*cph/rho, cth_o, r*sth_o*sph/rho));
+	vec3 eth = normalize(vec3(rho*cth_o*cph, -r*sth_o, rho*cth_o*sph));
+	vec3 eph = vec3(-sph, 0.0, cph);
+
+	float n1=dot(localDir,er), n2=dot(localDir,eth), n3=dot(localDir,eph);
+	float Sigma=r2+a2*cth_o*cth_o, Delta=r2-2.0*r+a2;
+	float A_met=(r2+a2)*(r2+a2)-a2*Delta*sth_o*sth_o;
+	float alpha_l=sqrt(Delta*Sigma/A_met), omega_f=2.0*a*r/A_met;
+
+	float kt=1.0/alpha_l, kr=n1*sqrt(Delta/Sigma), kth=n2/sqrt(Sigma);
+	float kph=omega_f/alpha_l + n3*sqrt(Sigma)/(sth_o*sqrt(A_met));
+
+	float g_tt=-(1.0-2.0*r/Sigma), g_tph=-2.0*a*r*sth_o*sth_o/Sigma;
+	float g_phph=sth_o*sth_o*A_met/Sigma;
+
+	float E=-(g_tt*kt+g_tph*kph), Lz=g_tph*kt+g_phph*kph;
+	lam_out=Lz/E;
+	float lam2=lam_out*lam_out, pth=Sigma*kth;
+	q2_out=(pth*pth)/(E*E)+cth_o*cth_o*(lam2/(sth_o*sth_o)-a2);
+
+	float P_c=a*lam_out, C_c=(lam_out-a)*(lam_out-a)+q2_out;
+	vr_out=(n1<0.0?-1.0:1.0)*sqrt(max(R_potential(r,a2,P_c,C_c),0.0));
+	vth_out=(n2<0.0?-1.0:1.0)*sqrt(max(Theta_potential_sc(sth_o,cth_o,a2,lam2,q2_out),0.0));
+}
+
+void main() {
+	uint idx = gl_GlobalInvocationID.x;
+	if (idx >= COARSE_W * COARSE_H) return;
+
+	uint ci = idx % uint(COARSE_W);
+	uint cj = idx / uint(COARSE_W);
+
+	//fine pixel coords for this coarse point
+	uint gx = ci * COARSE_K;
+	uint gy = cj * COARSE_K;
+
+	float a = spin_a;
+	float a2 = a * a;
+	float aspect = float(WIDTH) / float(HEIGHT);
+	float tanHalf = tan(radians(fov) * 0.5);
+	float sx = (2.0 * (float(gx) + 0.5) / float(WIDTH) - 1.0) * aspect * tanHalf;
+	float sy = (2.0 * (float(gy) + 0.5) / float(HEIGHT) - 1.0) * tanHalf;
+
+	//integrate this ray with mu = cos(theta)
+	float lam, q2, vr0, vth0;
+	screenToImpact(sx, sy, a, a2, lam, q2, vr0, vth0);
+	float lam2 = lam * lam;
+	float P_coeff = a * lam;
+	float C_coeff = (lam - a) * (lam - a) + q2;
+
+	float sth_o = sin(theta_obs);
+	float cur_r = r_obs, cur_vr = vr0;
+	float cur_mu = cos(theta_obs), cur_vmu = -sth_o * vth0; //mu=cos(th), vmu=-sin(th)*vth
+	float cur_ph = phi_obs;
+	float r_horizon = 1.0 + sqrt(1.0 - a2);
+	bool hitHorizon = false;
+	int numCrossings = 0;
+	float crossR[3], crossPhi[3], crossG[3];
+	for (int i = 0; i < 3; i++) { crossR[i] = 0.0; crossPhi[i] = 0.0; crossG[i] = 0.0; }
+	float min_r = cur_r; //track closest approach for photon sphere detection
+	for (int step = 0; step < MAX_STEPS; step++) {
+		//first rhs used both for the adaptive step size and as k1
+		float dr1,dvr1,dmu1,dvmu1,dph1;
+		rhs_mu(cur_r,cur_vr,cur_mu,cur_vmu,a,a2,lam,lam2,q2,P_coeff,C_coeff,dr1,dvr1,dmu1,dvmu1,dph1);
+		float ds = min(STEP_SIZE, 1.0 / (cur_r * cur_r));
+		float prev_r = cur_r, prev_mu = cur_mu, prev_ph = cur_ph;
+		float dr2,dvr2,dmu2,dvmu2,dph2;
+		float dr3,dvr3,dmu3,dvmu3,dph3,dr4,dvr4,dmu4,dvmu4,dph4;
+
+		rhs_mu(cur_r+.5*ds*dr1,cur_vr+.5*ds*dvr1,cur_mu+.5*ds*dmu1,cur_vmu+.5*ds*dvmu1,a,a2,lam,lam2,q2,P_coeff,C_coeff,dr2,dvr2,dmu2,dvmu2,dph2);
+		rhs_mu(cur_r+.5*ds*dr2,cur_vr+.5*ds*dvr2,cur_mu+.5*ds*dmu2,cur_vmu+.5*ds*dvmu2,a,a2,lam,lam2,q2,P_coeff,C_coeff,dr3,dvr3,dmu3,dvmu3,dph3);
+		rhs_mu(cur_r+ds*dr3,cur_vr+ds*dvr3,cur_mu+ds*dmu3,cur_vmu+ds*dvmu3,a,a2,lam,lam2,q2,P_coeff,C_coeff,dr4,dvr4,dmu4,dvmu4,dph4);
+
+		float s6 = ds / 6.0;
+		cur_r+=s6*(dr1+2.0*dr2+2.0*dr3+dr4);
+		cur_vr+=s6*(dvr1+2.0*dvr2+2.0*dvr3+dvr4);
+		cur_mu+=s6*(dmu1+2.0*dmu2+2.0*dmu3+dmu4);
+		cur_vmu+=s6*(dvmu1+2.0*dvmu2+2.0*dvmu3+dvmu4);
+		cur_ph+=s6*(dph1+2.0*dph2+2.0*dph3+dph4);
+
+		//reflect mu back if it overshoots past +/-1
+		if (cur_mu > 1.0) { cur_mu = 2.0 - cur_mu; cur_vmu = -cur_vmu; cur_ph += PI; }
+		if (cur_mu < -1.0) { cur_mu = -2.0 - cur_mu; cur_vmu = -cur_vmu; cur_ph += PI; }
+
+		min_r = min(min_r, cur_r);
+
+		//record crossings before the horizon/escape break so a step that both
+		//crosses the disk and plunges past the horizon keeps its final crossing
+		if (numCrossings < 3) {
+			if (prev_mu * cur_mu < 0.0) {
+				float frac = prev_mu / (prev_mu - cur_mu);
+				float cr = mix(prev_r, cur_r, frac);
+				if (cr >= diskIn && cr <= diskOut) {
+					float cp = prev_ph + frac * (cur_ph - prev_ph);
+					cp = mod(cp, 2.0 * PI);
+					float r15 = cr * sqrt(cr);
+					float Omega_K = 1.0 / (r15 + a);
+					float denom = cr*cr*cr - 3.0*cr*cr + 2.0*a*r15;
+					float cg = 0.0;
+					if (denom > 0.0) { float ut = (r15+a)/sqrt(denom); cg = 1.0/(ut*(1.0+Omega_K*lam)); }
+					crossR[numCrossings] = cr;
+					crossPhi[numCrossings] = cp;
+					crossG[numCrossings] = cg;
+					numCrossings++;
+				}
+			}
+		}
+		if (cur_r < r_horizon + R_HORIZON_EPS) { hitHorizon = true; break; }
+		if (cur_r > R_ESCAPE && cur_vr > 0.0) break;
+		//mod phi to prevent float overflow from winding near poles
+		cur_ph = mod(cur_ph, 2.0 * PI);
+	}
+
+	CoarsePoint cp;
+	if (hitHorizon || cur_r < r_horizon + 0.1) {
+		cp.sky_hit = vec4(0, 0, 2.0, float(numCrossings));
+	} else {
+		//velocity based sky direction
+		float esc_sth=sqrt(max(1.0-cur_mu*cur_mu,0.0));
+		float esc_cth=cur_mu;
+		float esc_sph=sin(cur_ph),esc_cph=cos(cur_ph);
+		float esc_rho=sqrt(cur_r*cur_r+a2);
+		float vx,vy,vz;
+		vy=cur_vr*esc_cth+cur_vmu*cur_r;
+		if(esc_sth>1e-7){
+			float esc_vth=-cur_vmu/esc_sth;
+			float dphi_esc=Phi_velocity_sc(cur_r,esc_sth,a,a2,lam,P_coeff);
+			vx=cur_vr*(cur_r*esc_sth*esc_cph/esc_rho)+esc_vth*(esc_rho*esc_cth*esc_cph)+dphi_esc*(-esc_rho*esc_sth*esc_sph);
+			vz=cur_vr*(cur_r*esc_sth*esc_sph/esc_rho)+esc_vth*(esc_rho*esc_cth*esc_sph)+dphi_esc*(esc_rho*esc_sth*esc_cph);
+		} else {
+			vx=0.0; vz=0.0;
+		}
+		vec3 skyDir = normalize(vec3(vx, vy, vz));
+		float sky_th = acos(clamp(skyDir.y, -1.0, 1.0));
+		float sky_ph = atan(skyDir.z, skyDir.x);
+		cp.sky_hit = vec4(sky_th, sky_ph, 0.0, float(numCrossings > 0 ? 1 : 0));
+	}
+
+	cp.sky_hit.w = float(numCrossings);
+	//stash min_r in disk0.w so the per pixel pass can detect photon sphere
+	//grazing rays that would otherwise slip between coarse samples
+	cp.disk0 = vec4(crossR[0], crossPhi[0], crossG[0], min_r);
+	cp.disk1 = vec4(crossR[1], crossPhi[1], crossG[1], 0);
+	cp.disk2 = vec4(crossR[2], crossPhi[2], crossG[2], 0);
+	coarse[idx] = cp;
+}
