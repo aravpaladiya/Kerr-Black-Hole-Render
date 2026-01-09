@@ -22,7 +22,16 @@
     <ClCompile Include="glad.c">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="engine.cpp" />
+    <ClCompile Include="engine.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="kerr_engine.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+    </ClCompile>
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">pch.h</PrecompiledHeaderFile>
@@ -35,6 +44,9 @@
     <None Include="shaders\ray.comp" />
     <None Include="shaders\shader.frag" />
     <None Include="shaders\shader.vert" />
+    <None Include="shaders\kerr.comp" />
+    <None Include="shaders\kerr.frag" />
+    <None Include="shaders\kerr_tile.comp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Camera.h" />
@@ -47,22 +59,23 @@
     <ClInclude Include="shader.h" />
   </ItemGroup>
   <ItemGroup>
-    <Image Include="back.png" />
-    <Image Include="bottom.png" />
-    <Image Include="container.jpg" />
-    <Image Include="container2.png" />
-    <Image Include="container2_specular.png" />
-    <Image Include="front.png" />
-    <Image Include="left.png" />
-    <Image Include="right.png" />
+    <Image Include="res\adisk.jpg" />
+    <Image Include="res\back.png" />
+    <Image Include="res\bottom.png" />
+    <Image Include="res\container.jpg" />
+    <Image Include="res\container2.png" />
+    <Image Include="res\container2_specular.png" />
+    <Image Include="res\front.png" />
+    <Image Include="res\left.png" />
+    <Image Include="res\right.png" />
     <Image Include="skyboxtest\back.png" />
     <Image Include="skyboxtest\bottom.png" />
     <Image Include="skyboxtest\front.png" />
     <Image Include="skyboxtest\left.png" />
     <Image Include="skyboxtest\right.png" />
     <Image Include="skyboxtest\top.png" />
-    <Image Include="top.png" />
-    <Image Include="wall.jpg" />
+    <Image Include="res\top.png" />
+    <Image Include="res\wall.jpg" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="fragmentall.txt" />
