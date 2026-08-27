@@ -361,3 +361,15 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+# large/unused assets: only ship the cubemap + colormap the renderer loads
+BlackHoleRender/res/*
+!BlackHoleRender/res/eso_cubemap/
+!BlackHoleRender/res/eso_cubemap/**
+!BlackHoleRender/res/blackbody.png
+!BlackHoleRender/res/README.txt
+
+# build artifacts
+*.exe
+*.gch
+.vscode/
